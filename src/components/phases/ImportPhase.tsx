@@ -6,11 +6,7 @@ import { loadConfig, loadState, saveState } from '../../utils/config';
 import { checkCloudSession, loadFromSupabase, deleteCloudSession } from '../../utils/supabase';
 import type { SpotifyPlaylist, SpotifyUser } from '../../utils/types';
 
-interface Props {
-  onSyncTrigger?: (fn: () => Promise<void>) => void;
-}
-
-export default function ImportPhase({ onSyncTrigger }: Props) {
+export default function ImportPhase() {
   const { state, dispatch, showToast } = useApp();
   const { isLoggedIn, login, handleCallback, getToken, logout } = useSpotifyAuth();
 
@@ -22,6 +18,7 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
   const [selectedPl, setSelectedPl] = useState<SpotifyPlaylist | null>(null);
   const [sourceTab, setSourceTab] = useState<'liked' | 'playlist'>('liked');
   const [plLoading, setPlLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const cfg = loadConfig();
 
   // OAuth callback
@@ -57,41 +54,42 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
     checkCloudSession(cfg).then(setCloudInfo);
   }, [isLoggedIn()]);
 
-  // expose sync function
-  useEffect(() => {
-    if (onSyncTrigger) onSyncTrigger(handleSync);
-  }, [state.tracks.length]);
-
   async function handleSync() {
-  if (!state.tracks.length) { showToast('⚠️ 먼저 음악 소스를 불러오세요'); return; }
-  const knownIds = new Set(state.tracks.map(t => t.id));
-  const endpoint = state.currentSource === 'liked' ? '/me/tracks?limit=50'
-    : state.currentSource?.startsWith('playlist:') ? `/playlists/${state.currentSource.split(':')[1]}/tracks?limit=50`
-    : null;
-  if (!endpoint) return;
-  try {
-    const all = await fetchAllTracks(endpoint, getToken);
-    const remoteIds = new Set(all.map(t => t.id));
+    if (!state.tracks.length) { showToast('⚠️ 먼저 음악 소스를 불러오세요'); return; }
+    setIsSyncing(true);
+    try {
+      const knownIds = new Set(state.tracks.map(t => t.id));
+      const endpoint = state.currentSource === 'liked' ? '/me/tracks?limit=50'
+        : state.currentSource?.startsWith('playlist:') ? `/playlists/${state.currentSource.split(':')[1]}/tracks?limit=50`
+        : null;
+      if (!endpoint) return;
 
-    // 신규: Spotify에만 있고 로컬에 없는 곡
-    const newOnes = all.filter(t => !knownIds.has(t.id)).map(t => ({ ...t, isNew: true }));
-    // 제거: 로컬에 있지만 Spotify에 없는 곡
-    const removedIds = state.tracks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
+      const all = await fetchAllTracks(endpoint, getToken);
+      const remoteIds = new Set(all.map(t => t.id));
 
-    if (!newOnes.length && !removedIds.length) {
-      showToast('✅ 변경사항 없음');
-      return;
+      // 신규: Spotify에만 있고 로컬에 없는 곡
+      const newOnes = all.filter(t => !knownIds.has(t.id)).map(t => ({ ...t, isNew: true }));
+      // 제거: 로컬에 있지만 Spotify에 없는 곡
+      const removedIds = state.tracks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
+
+      if (!newOnes.length && !removedIds.length) {
+        showToast('✅ 변경사항 없음');
+        return;
+      }
+
+      if (newOnes.length) dispatch({ type: 'SET_PENDING_NEW', payload: newOnes });
+      if (removedIds.length) dispatch({ type: 'SET_PENDING_REMOVED', payload: removedIds });
+
+      const parts: string[] = [];
+      if (newOnes.length) parts.push(`신규 ${newOnes.length}곡`);
+      if (removedIds.length) parts.push(`제거 ${removedIds.length}곡`);
+      showToast(`✦ ${parts.join(' · ')} 감지됨`);
+    } catch (e) {
+      showToast('❌ 동기화 실패: ' + String(e));
+    } finally {
+      setIsSyncing(false);
     }
-
-    if (newOnes.length) dispatch({ type: 'SET_PENDING_NEW', payload: newOnes });
-    if (removedIds.length) dispatch({ type: 'SET_PENDING_REMOVED', payload: removedIds });
-
-    const parts: string[] = [];
-    if (newOnes.length) parts.push(`신규 ${newOnes.length}곡`);
-    if (removedIds.length) parts.push(`제거 ${removedIds.length}곡`);
-    showToast(`✦ ${parts.join(' · ')} 감지됨`);
-  } catch (e) { showToast('❌ 동기화 실패: ' + String(e)); }
-}
+  }
 
   async function loadLiked() {
     setLoading(true); setLoadingText('좋아요 곡 불러오는 중…');
@@ -169,10 +167,16 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 01-.277-1.215c3.809-.87 7.076-.495 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.78.78 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 01-.973-.519.781.781 0 01.52-.973c3.632-1.102 8.147-.568 11.233 1.329a.78.78 0 01.257 1.072zm.105-2.835C14.69 9.145 9.375 8.955 6.204 9.88a.937.937 0 11-.543-1.794c3.618-1.096 9.635-.884 13.432 1.312a.937.937 0 01-.179 1.469z"/></svg>
           Spotify로 로그인
         </button>
-        <p style={{ marginTop: 16, fontSize: '0.78rem', color: '#556070' }}>설정(⚙)에서 Spotify Client ID와 Supabase 정보를 먼저 입력하세요</p>
+        {!cfg.clientId && (
+          <p style={{ marginTop: 16, fontSize: '0.78rem', color: '#556070' }}>
+            Client ID가 설정되지 않았습니다. <kbd style={{ padding: '1px 6px', border: '1px solid #2a2a3e', borderRadius: 4, fontSize: '0.72rem', fontFamily: '"DM Mono", monospace' }}>Ctrl</kbd>+<kbd style={{ padding: '1px 6px', border: '1px solid #2a2a3e', borderRadius: 4, fontSize: '0.72rem', fontFamily: '"DM Mono", monospace' }}>,</kbd>로 설정을 여세요.
+          </p>
+        )}
       </div>
     );
   }
+
+  const pendingCount = state.pendingNewTracks.length + state.pendingRemovedIds.length;
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '32px 24px' }}>
@@ -195,6 +199,30 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.supabaseUrl ? '#00e87a' : '#556070' }} />
               {cfg.supabaseUrl ? 'Supabase 연결됨' : 'Supabase 미설정'}
             </div>
+            {state.tracks.length > 0 && (
+              <button
+                onClick={handleSync}
+                disabled={isSyncing}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '7px 14px', borderRadius: 8,
+                  border: '1px solid ' + (isSyncing ? 'rgba(0,232,122,0.4)' : '#2a2a3e'),
+                  background: 'transparent',
+                  color: isSyncing ? '#00e87a' : '#8899aa',
+                  cursor: isSyncing ? 'default' : 'pointer',
+                  fontFamily: '"DM Sans", sans-serif', fontSize: '0.82rem', fontWeight: 500,
+                  transition: 'all 0.15s', whiteSpace: 'nowrap',
+                }}
+              >
+                <span style={{ display: 'inline-block', animation: isSyncing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
+                동기화
+                {pendingCount > 0 && (
+                  <span style={{ background: '#00e87a', color: '#000', borderRadius: 10, padding: '1px 6px', fontSize: '0.7rem', fontWeight: 700, fontFamily: '"DM Mono", monospace' }}>
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            )}
             <button onClick={handleLogout} style={S.btn('outline')}>로그아웃</button>
           </div>
         </div>
@@ -212,34 +240,34 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
         </div>
       )}
 
-{/* 제거 감지 배너 */}
-{state.pendingRemovedIds.length > 0 && (
-  <div style={{ background: 'rgba(255,107,107,0.08)', border: '1.5px solid rgba(255,107,107,0.35)', borderRadius: 12, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-    <div style={{ fontFamily: '"DM Mono", monospace', fontSize: '1.4rem', fontWeight: 700, color: '#ff6b6b', flexShrink: 0 }}>{state.pendingRemovedIds.length}</div>
-    <div style={{ flex: 1, fontSize: '0.88rem', lineHeight: 1.5 }}>
-      <strong>Spotify에서 제거된 곡이 감지되었습니다</strong><br />
-      <span style={{ fontSize: '0.82rem', color: '#8899aa' }}>
-        {state.tracks
-          .filter(t => state.pendingRemovedIds.includes(t.id))
-          .slice(0, 3)
-          .map(t => `${t.name} — ${t.artists[0]}`)
-          .join(' / ')}
-        {state.pendingRemovedIds.length > 3 ? ` 외 ${state.pendingRemovedIds.length - 3}곡` : ''}
-      </span>
-    </div>
-    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-      <button onClick={() => dispatch({ type: 'APPLY_REMOVAL' })}
-        style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(255,107,107,0.5)', background: 'transparent', color: '#ff6b6b', cursor: 'pointer', fontFamily: '"DM Sans", sans-serif', fontSize: '0.82rem', fontWeight: 600 }}>
-        로컬에서도 삭제
-      </button>
-      <button onClick={() => dispatch({ type: 'DISMISS_REMOVAL' })}
-        style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #2a2a3e', background: 'transparent', color: '#8899aa', cursor: 'pointer', fontFamily: '"DM Sans", sans-serif', fontSize: '0.82rem', fontWeight: 600 }}>
-        유지
-      </button>
-    </div>
-  </div>
-)}
-      
+      {/* Removed tracks banner */}
+      {state.pendingRemovedIds.length > 0 && (
+        <div style={{ background: 'rgba(255,107,107,0.08)', border: '1.5px solid rgba(255,107,107,0.35)', borderRadius: 12, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontFamily: '"DM Mono", monospace', fontSize: '1.4rem', fontWeight: 700, color: '#ff6b6b', flexShrink: 0 }}>{state.pendingRemovedIds.length}</div>
+          <div style={{ flex: 1, fontSize: '0.88rem', lineHeight: 1.5 }}>
+            <strong>Spotify에서 제거된 곡이 감지되었습니다</strong><br />
+            <span style={{ fontSize: '0.82rem', color: '#8899aa' }}>
+              {state.tracks
+                .filter(t => state.pendingRemovedIds.includes(t.id))
+                .slice(0, 3)
+                .map(t => `${t.name} — ${t.artists[0]}`)
+                .join(' / ')}
+              {state.pendingRemovedIds.length > 3 ? ` 외 ${state.pendingRemovedIds.length - 3}곡` : ''}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={() => dispatch({ type: 'APPLY_REMOVAL' })}
+              style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(255,107,107,0.5)', background: 'transparent', color: '#ff6b6b', cursor: 'pointer', fontFamily: '"DM Sans", sans-serif', fontSize: '0.82rem', fontWeight: 600 }}>
+              로컬에서도 삭제
+            </button>
+            <button onClick={() => dispatch({ type: 'DISMISS_REMOVAL' })}
+              style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #2a2a3e', background: 'transparent', color: '#8899aa', cursor: 'pointer', fontFamily: '"DM Sans", sans-serif', fontSize: '0.82rem', fontWeight: 600 }}>
+              유지
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Source picker */}
       <div style={S.card}>
         <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#556070', marginBottom: 16, fontFamily: '"DM Mono", monospace' }}>음악 소스 선택</div>

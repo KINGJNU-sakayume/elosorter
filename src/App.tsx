@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from './context/AppContext';
 import { useSpotifyAuth } from './hooks/useSpotifyAuth';
 import { useSpotifyPlayer } from './hooks/useSpotifyPlayer';
@@ -15,27 +15,26 @@ export default function App() {
   const player = useSpotifyPlayer(getToken);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const syncFnRef = useRef<(() => Promise<void>) | null>(null);
 
-  async function handleSync() {
-    if (!syncFnRef.current) return;
-    setIsSyncing(true);
-    await syncFnRef.current();
-    setIsSyncing(false);
-  }
+  // 전역 단축키: Ctrl+, (Mac: Cmd+,) → 설정 모달 열기
+  // UI에서 설정 버튼을 제거했지만, env 주입이 실패했을 때 수동 입력용 탈출구로 남겨둠
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+        e.preventDefault();
+        setSettingsOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const { phase } = state;
 
   return (
     <div style={{ minHeight: '100vh', background: '#090912', color: '#f0f0f8', fontFamily: '"DM Sans", sans-serif' }}>
-      <Header
-        onSettingsClick={() => setSettingsOpen(true)}
-        onSyncClick={handleSync}
-        syncCount={state.pendingNewTracks.length}
-        isSyncing={isSyncing}
-      />
-      {phase === 'import' && <ImportPhase onSyncTrigger={fn => { syncFnRef.current = fn; }} />}
+      <Header />
+      {phase === 'import' && <ImportPhase />}
       {phase === 'tier'   && <TierPhase player={player} />}
       {phase === 'sort'   && <SortPhase player={player} />}
       {phase === 'rank'   && <RankPhase />}
