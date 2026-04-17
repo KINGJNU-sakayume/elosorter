@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useKeyboard } from '../../hooks/useKeyboard';
 import { loadConfig, saveState } from '../../utils/config';
@@ -9,10 +9,15 @@ interface Props {
   player: PlayerState & { play: (uri: string) => Promise<void>; toggle: () => void };
 }
 
+// 자동 저장: N번 배정마다 저장
+const AUTOSAVE_EVERY_N = 10;
+
 export default function TierPhase({ player }: Props) {
   const { state, dispatch, showToast } = useApp();
   const { tracks, tierHistory } = state;
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [lastSavedCount, setLastSavedCount] = useState(0);
   const cfg = loadConfig();
 
   const untiered = tracks.filter(t => t.tier === null);
@@ -29,6 +34,34 @@ export default function TierPhase({ player }: Props) {
   const c2 = tracks.filter(t => t.tier === 2).length;
   const c3 = tracks.filter(t => t.tier === 3).length;
 
+  const unsavedCount = done - lastSavedCount;
+  const hasUnsaved = unsavedCount > 0;
+
+  // 저장 함수 (중복 호출 방지용 ref)
+  const savingRef = useRef(false);
+  const runCloudSave = useCallback(async (reason: 'auto' | 'manual' | 'done') => {
+    if (savingRef.current) return;
+    if (!cfg.supabaseUrl || !cfg.anonKey) return; // supabase 미설정이면 조용히 skip
+    savingRef.current = true;
+    setSaveStatus('saving');
+    const data = { tracks: state.tracks, compCount: state.compCount, rsiDeltas: state.rsiDeltas, currentSource: state.currentSource };
+    const currentDone = state.tracks.filter(t => t.tier !== null).length;
+    try {
+      const r = await saveToSupabase(data, cfg);
+      setSaveStatus(r.ok ? 'ok' : 'error');
+      if (r.ok) {
+        setLastSavedAt(new Date());
+        setLastSavedCount(currentDone);
+        if (reason === 'manual') showToast('☁️ Supabase에 저장됨');
+        else if (reason === 'done') showToast('☁️ Supabase에 저장됨');
+      } else if (reason === 'manual') {
+        showToast('❌ 저장 실패 — 네트워크를 확인해주세요');
+      }
+    } finally {
+      savingRef.current = false;
+    }
+  }, [cfg, state, showToast]);
+
   // Auto-play on track change
   useEffect(() => {
     if (!currentTrack) return;
@@ -37,17 +70,33 @@ export default function TierPhase({ player }: Props) {
     }
   }, [currentTrack?.id]);
 
-  // Auto-save when tier done
+  // 분류 완료시 한번 저장
   useEffect(() => {
     if (!allDone || !tracks.length) return;
-    setSaveStatus('saving');
-    const data = { tracks: state.tracks, compCount: state.compCount, rsiDeltas: state.rsiDeltas, currentSource: state.currentSource };
-    saveState(data);
-    saveToSupabase(data, cfg).then(r => {
-      setSaveStatus(r.ok ? 'ok' : 'error');
-      if (r.ok) showToast('☁️ Supabase에 저장됨');
-    });
+    saveState({ tracks: state.tracks, compCount: state.compCount, rsiDeltas: state.rsiDeltas, currentSource: state.currentSource });
+    runCloudSave('done');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allDone]);
+
+  // 자동저장: N번 배정마다 저장
+  useEffect(() => {
+    if (done === 0 || allDone) return;
+    if (unsavedCount >= AUTOSAVE_EVERY_N) {
+      runCloudSave('auto');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done]);
+
+  // 이탈 경고: 미저장 변경사항이 있는 상태로 탭 닫을 때
+  useEffect(() => {
+    if (!hasUnsaved) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasUnsaved]);
 
   const assignTier = useCallback((tier: 1 | 2 | 3) => {
     if (!currentTrack) return;
@@ -79,6 +128,28 @@ export default function TierPhase({ player }: Props) {
     }),
   };
 
+  // 저장 상태 표시 헬퍼
+  function SaveStatusIndicator() {
+    if (!cfg.supabaseUrl) {
+      return <span style={{ fontSize: '0.74rem', color: 'var(--text-tertiary)', fontFamily: '"DM Mono", monospace' }}>☁ 로컬만 저장</span>;
+    }
+    if (saveStatus === 'saving') {
+      return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', color: 'var(--accent)', fontFamily: '"DM Mono", monospace' }}><span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />저장 중…</span>;
+    }
+    if (saveStatus === 'error') {
+      return <span style={{ fontSize: '0.74rem', color: 'var(--danger)', fontFamily: '"DM Mono", monospace' }}>⚠ 저장 실패</span>;
+    }
+    if (hasUnsaved) {
+      return <span style={{ fontSize: '0.74rem', color: 'var(--warning)', fontFamily: '"DM Mono", monospace' }}>● 미저장 {unsavedCount}곡</span>;
+    }
+    if (lastSavedAt) {
+      const mins = Math.floor((Date.now() - lastSavedAt.getTime()) / 60000);
+      const label = mins < 1 ? '방금' : `${mins}분 전`;
+      return <span style={{ fontSize: '0.74rem', color: 'var(--text-tertiary)', fontFamily: '"DM Mono", monospace' }}>☁ 저장됨 · {label}</span>;
+    }
+    return <span style={{ fontSize: '0.74rem', color: 'var(--text-tertiary)', fontFamily: '"DM Mono", monospace' }}>☁ 준비됨</span>;
+  }
+
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '32px 24px' }}>
       {/* Progress */}
@@ -88,9 +159,30 @@ export default function TierPhase({ player }: Props) {
       <div style={{ background: 'var(--bg-sub)', borderRadius: 99, height: 4, overflow: 'hidden', marginBottom: 12 }}>
         <div style={{ height: '100%', borderRadius: 99, background: 'var(--accent-border)', width: `${totalPct}%`, transition: 'width 0.4s ease' }} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 24, gap: 12, flexWrap: 'wrap' }}>
         <span>{done} / {tracks.length} 완료</span>
-        <span>{allDone ? '완료!' : `남은 곡: ${untiered.length}`}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <SaveStatusIndicator />
+          {!allDone && done > 0 && cfg.supabaseUrl && (
+            <button
+              onClick={() => runCloudSave('manual')}
+              disabled={saveStatus === 'saving' || !hasUnsaved}
+              style={{
+                padding: '4px 10px', borderRadius: 6,
+                border: '1px solid ' + (hasUnsaved ? 'var(--accent-border)' : 'var(--border)'),
+                background: 'transparent',
+                color: hasUnsaved ? 'var(--accent)' : 'var(--text-tertiary)',
+                cursor: (saveStatus === 'saving' || !hasUnsaved) ? 'default' : 'pointer',
+                fontSize: '0.72rem', fontFamily: '"DM Mono", monospace',
+                opacity: (saveStatus === 'saving' || !hasUnsaved) ? 0.5 : 1,
+                transition: 'all 0.15s',
+              }}
+            >
+              ☁ 지금 저장
+            </button>
+          )}
+          <span>{allDone ? '완료!' : `남은 곡: ${untiered.length}`}</span>
+        </div>
       </div>
 
       {allDone ? (
@@ -103,7 +195,7 @@ export default function TierPhase({ player }: Props) {
           {saveStatus === 'error' && (
             <div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', borderRadius: 12, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ color: 'var(--danger)', fontSize: '0.88rem' }}>☁️ 저장 실패 — 네트워크를 확인해주세요</span>
-              <button onClick={() => { setSaveStatus('saving'); saveToSupabase({ tracks: state.tracks, compCount: state.compCount, rsiDeltas: state.rsiDeltas, currentSource: state.currentSource }, cfg).then(r => setSaveStatus(r.ok ? 'ok' : 'error')); }} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--danger-border)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}>재시도</button>
+              <button onClick={() => runCloudSave('manual')} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--danger-border)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}>재시도</button>
             </div>
           )}
           {saveStatus === 'ok' && <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 16 }}>☁️ 저장됨</div>}
