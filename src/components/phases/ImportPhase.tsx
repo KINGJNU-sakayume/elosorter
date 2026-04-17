@@ -63,20 +63,35 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
   }, [state.tracks.length]);
 
   async function handleSync() {
-    if (!state.tracks.length) { showToast('⚠️ 먼저 음악 소스를 불러오세요'); return; }
-    const knownIds = new Set(state.tracks.map(t => t.id));
-    const endpoint = state.currentSource === 'liked' ? '/me/tracks?limit=50'
-      : state.currentSource?.startsWith('playlist:') ? `/playlists/${state.currentSource.split(':')[1]}/tracks?limit=50`
-      : null;
-    if (!endpoint) return;
-    try {
-      const all = await fetchAllTracks(endpoint, getToken);
-      const newOnes = all.filter(t => !knownIds.has(t.id)).map(t => ({ ...t, isNew: true }));
-      if (!newOnes.length) { showToast('✅ 신규 곡 없음'); return; }
-      dispatch({ type: 'SET_PENDING_NEW', payload: newOnes });
-      showToast(`✦ ${newOnes.length}곡 신규 감지됨`);
-    } catch (e) { showToast('❌ 동기화 실패: ' + String(e)); }
-  }
+  if (!state.tracks.length) { showToast('⚠️ 먼저 음악 소스를 불러오세요'); return; }
+  const knownIds = new Set(state.tracks.map(t => t.id));
+  const endpoint = state.currentSource === 'liked' ? '/me/tracks?limit=50'
+    : state.currentSource?.startsWith('playlist:') ? `/playlists/${state.currentSource.split(':')[1]}/tracks?limit=50`
+    : null;
+  if (!endpoint) return;
+  try {
+    const all = await fetchAllTracks(endpoint, getToken);
+    const remoteIds = new Set(all.map(t => t.id));
+
+    // 신규: Spotify에만 있고 로컬에 없는 곡
+    const newOnes = all.filter(t => !knownIds.has(t.id)).map(t => ({ ...t, isNew: true }));
+    // 제거: 로컬에 있지만 Spotify에 없는 곡
+    const removedIds = state.tracks.filter(t => !remoteIds.has(t.id)).map(t => t.id);
+
+    if (!newOnes.length && !removedIds.length) {
+      showToast('✅ 변경사항 없음');
+      return;
+    }
+
+    if (newOnes.length) dispatch({ type: 'SET_PENDING_NEW', payload: newOnes });
+    if (removedIds.length) dispatch({ type: 'SET_PENDING_REMOVED', payload: removedIds });
+
+    const parts: string[] = [];
+    if (newOnes.length) parts.push(`신규 ${newOnes.length}곡`);
+    if (removedIds.length) parts.push(`제거 ${removedIds.length}곡`);
+    showToast(`✦ ${parts.join(' · ')} 감지됨`);
+  } catch (e) { showToast('❌ 동기화 실패: ' + String(e)); }
+}
 
   async function loadLiked() {
     setLoading(true); setLoadingText('좋아요 곡 불러오는 중…');
@@ -197,6 +212,34 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
         </div>
       )}
 
+{/* 제거 감지 배너 */}
+{state.pendingRemovedIds.length > 0 && (
+  <div style={{ background: 'rgba(255,107,107,0.08)', border: '1.5px solid rgba(255,107,107,0.35)', borderRadius: 12, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ fontFamily: '"DM Mono", monospace', fontSize: '1.4rem', fontWeight: 700, color: '#ff6b6b', flexShrink: 0 }}>{state.pendingRemovedIds.length}</div>
+    <div style={{ flex: 1, fontSize: '0.88rem', lineHeight: 1.5 }}>
+      <strong>Spotify에서 제거된 곡이 감지되었습니다</strong><br />
+      <span style={{ fontSize: '0.82rem', color: '#8899aa' }}>
+        {state.tracks
+          .filter(t => state.pendingRemovedIds.includes(t.id))
+          .slice(0, 3)
+          .map(t => `${t.name} — ${t.artists[0]}`)
+          .join(' / ')}
+        {state.pendingRemovedIds.length > 3 ? ` 외 ${state.pendingRemovedIds.length - 3}곡` : ''}
+      </span>
+    </div>
+    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+      <button onClick={() => dispatch({ type: 'APPLY_REMOVAL' })}
+        style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(255,107,107,0.5)', background: 'transparent', color: '#ff6b6b', cursor: 'pointer', fontFamily: '"DM Sans", sans-serif', fontSize: '0.82rem', fontWeight: 600 }}>
+        로컬에서도 삭제
+      </button>
+      <button onClick={() => dispatch({ type: 'DISMISS_REMOVAL' })}
+        style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #2a2a3e', background: 'transparent', color: '#8899aa', cursor: 'pointer', fontFamily: '"DM Sans", sans-serif', fontSize: '0.82rem', fontWeight: 600 }}>
+        유지
+      </button>
+    </div>
+  </div>
+)}
+      
       {/* Source picker */}
       <div style={S.card}>
         <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#556070', marginBottom: 16, fontFamily: '"DM Mono", monospace' }}>음악 소스 선택</div>

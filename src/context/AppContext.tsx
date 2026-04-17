@@ -16,6 +16,7 @@ const initial: AppState = {
   isChoosing: false,
   user: null,
   pendingNewTracks: [],
+  pendingRemovedIds: [],   // 🆕
 };
 
 function reducer(state: AppState, action: AppAction): AppState {
@@ -83,6 +84,25 @@ function reducer(state: AppState, action: AppAction): AppState {
       const curPair = getNextPair(merged, state.seenPairs, state.lastPairKey);
       return { ...state, tracks: merged, pendingNewTracks: [], curPair };
     }
+
+    // 🆕 Spotify에서 제거된 ID를 "삭제 대기" 상태로 기록
+    case 'SET_PENDING_REMOVED':
+      return { ...state, pendingRemovedIds: action.payload };
+
+    // 🆕 실제로 삭제 적용
+    case 'APPLY_REMOVAL': {
+      if (!state.pendingRemovedIds.length) return state;
+      const removedSet = new Set(state.pendingRemovedIds);
+      const tracks = state.tracks.filter(t => !removedSet.has(t.id));
+      // tierHistory도 정리 (삭제된 곡은 undo 대상에서 제외)
+      const tierHistory = state.tierHistory.filter(id => !removedSet.has(id));
+      const curPair = getNextPair(tracks, state.seenPairs, state.lastPairKey);
+      return { ...state, tracks, tierHistory, pendingRemovedIds: [], curPair };
+    }
+
+    // 🆕 삭제 대기 해제 (로컬에 계속 유지)
+    case 'DISMISS_REMOVAL':
+      return { ...state, pendingRemovedIds: [] };
 
     case 'LOAD_STATE': {
       const { seenPairs, tracks, ...rest } = action.payload;
