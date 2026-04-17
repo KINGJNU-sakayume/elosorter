@@ -8,16 +8,9 @@ const TABS: { id: Phase; label: string; step: string }[] = [
   { id: 'rank',   label: '랭킹',      step: '3' },
 ];
 
-interface Props {
-  onSettingsClick: () => void;
-  onSyncClick: () => void;
-  syncCount: number;
-  isSyncing: boolean;
-}
-
-export default function Header({ onSettingsClick, onSyncClick, syncCount, isSyncing }: Props) {
+export default function Header() {
   const { state, dispatch } = useApp();
-  const { phase, tracks, pendingNewTracks } = state;
+  const { phase, tracks } = state;
   const hasData = tracks.length > 0;
 
   function goPhase(p: Phase) {
@@ -62,31 +55,6 @@ export default function Header({ onSettingsClick, onSyncClick, syncCount, isSync
           );
         })}
       </nav>
-
-      {hasData && (
-        <button
-          onClick={onSyncClick}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 6, border: '1px solid ' + (isSyncing ? 'rgba(0,232,122,0.4)' : '#2a2a3e'), background: 'transparent', color: isSyncing ? '#00e87a' : '#8899aa', fontFamily: '"DM Sans", sans-serif', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}
-        >
-          <span style={{ display: 'inline-block', transition: 'transform 0.8s', animation: isSyncing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
-          동기화
-          {syncCount > 0 && (
-            <span style={{ background: '#00e87a', color: '#000', borderRadius: 10, padding: '1px 6px', fontSize: '0.7rem', fontWeight: 700, fontFamily: '"DM Mono", monospace' }}>
-              {syncCount}
-            </span>
-          )}
-          {pendingNewTracks.length > 0 && syncCount === 0 && (
-            <span style={{ background: '#00e87a', color: '#000', borderRadius: 10, padding: '1px 6px', fontSize: '0.7rem', fontWeight: 700, fontFamily: '"DM Mono", monospace' }}>
-              {pendingNewTracks.length}
-            </span>
-          )}
-        </button>
-      )}
-
-      <button
-        onClick={onSettingsClick}
-        style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid transparent', background: 'transparent', color: '#8899aa', cursor: 'pointer', fontSize: '1rem', flexShrink: 0 }}
-      >⚙</button>
     </div>
   );
 }
