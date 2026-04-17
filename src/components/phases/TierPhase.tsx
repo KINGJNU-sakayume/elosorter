@@ -191,62 +191,68 @@ export default function TierPhase({ player }: Props) {
               )}
             </div>
 
-            {/* Stats - 목표 분포 대비 시각화 */}
+            {/* Stats - 4개 차트 버전 */}
             <div style={{ padding: 16, background: '#0f0f1a', borderRadius: 12, border: '1px solid #2a2a3e' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
                 <h4 style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#556070' }}>분류 현황</h4>
                 <span style={{ fontSize: '0.75rem', color: '#8899aa', fontFamily: '"DM Mono", monospace' }}>{done} / {tracks.length}</span>
               </div>
 
-              {/* 전체 분포 스택 바 + 목표 마커(10%, 50%) */}
-              <div style={{ position: 'relative', marginBottom: 10 }}>
-                <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: '#1c1c2c' }}>
-                  <div style={{ width: `${(c1 / tracks.length) * 100}%`, background: '#ffd60a', transition: 'width 0.3s' }} />
-                  <div style={{ width: `${(c2 / tracks.length) * 100}%`, background: '#4cc9f0', transition: 'width 0.3s' }} />
-                  <div style={{ width: `${(c3 / tracks.length) * 100}%`, background: '#7c8fa6', transition: 'width 0.3s' }} />
-                </div>
-                {/* 이상적 분포 경계 마커 */}
-                <div style={{ position: 'absolute', left: '10%', top: -3, bottom: -3, width: 2, background: '#f0f0f8', opacity: 0.55, borderRadius: 1 }} />
-                <div style={{ position: 'absolute', left: '50%', top: -3, bottom: -3, width: 2, background: '#f0f0f8', opacity: 0.55, borderRadius: 1 }} />
-              </div>
-              <div style={{ position: 'relative', height: 14, marginBottom: 16, fontSize: '0.65rem', color: '#556070', fontFamily: '"DM Mono", monospace' }}>
-                <span style={{ position: 'absolute', left: '10%', transform: 'translateX(-50%)' }}>목표 10%</span>
-                <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>목표 50%</span>
-              </div>
+              {/* ① 상단 스택 바 — 분류된 곡 중의 상대 비율 */}
+              {done > 0 ? (
+                <>
+                  <div style={{ position: 'relative', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: '#1c1c2c' }}>
+                      <div style={{ width: `${(c1 / done) * 100}%`, background: '#ffd60a', transition: 'width 0.3s' }} />
+                      <div style={{ width: `${(c2 / done) * 100}%`, background: '#4cc9f0', transition: 'width 0.3s' }} />
+                      <div style={{ width: `${(c3 / done) * 100}%`, background: '#7c8fa6', transition: 'width 0.3s' }} />
+                    </div>
+                    {/* 이상적 분포 경계 마커 (10%, 50%) */}
+                    <div style={{ position: 'absolute', left: '10%', top: -3, bottom: -3, width: 2, background: '#f0f0f8', opacity: 0.55, borderRadius: 1 }} />
+                    <div style={{ position: 'absolute', left: '50%', top: -3, bottom: -3, width: 2, background: '#f0f0f8', opacity: 0.55, borderRadius: 1 }} />
+                  </div>
+                  <div style={{ position: 'relative', height: 14, marginBottom: 18, fontSize: '0.65rem', color: '#556070', fontFamily: '"DM Mono", monospace' }}>
+                    <span style={{ position: 'absolute', left: '10%', transform: 'translateX(-50%)' }}>목표 10%</span>
+                    <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>목표 50%</span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ height: 10, borderRadius: 5, background: '#1c1c2c', marginBottom: 18 }} />
+              )}
 
-              {/* 티어별 목표 대비 */}
+              {/* ②③④ 각 tier별 독립 진척 바 */}
               {[
                 { label: '💛 Tier 1 최애', val: c1, ratio: 0.10, color: '#ffd60a' },
                 { label: '👍 Tier 2 선호', val: c2, ratio: 0.40, color: '#4cc9f0' },
                 { label: '🎵 Tier 3 보통', val: c3, ratio: 0.50, color: '#7c8fa6' },
               ].map(t => {
                 const target = Math.round(tracks.length * t.ratio);
-                const diff = t.val - target;
-                const pct = tracks.length > 0 ? Math.round((t.val / tracks.length) * 100) : 0;
-                const targetPct = Math.round(t.ratio * 100);
                 const fillPct = target > 0 ? Math.min(100, (t.val / target) * 100) : 0;
-                const over = diff > 0;
-                const perfect = diff === 0;
+                const curPct = done > 0 ? Math.round((t.val / done) * 100) : 0;
+                const targetPct = Math.round(t.ratio * 100);
                 return (
-                  <div key={t.label} style={{ marginBottom: 10 }}>
+                  <div key={t.label} style={{ marginBottom: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
                       <span style={{ fontSize: '0.82rem', color: t.color }}>{t.label}</span>
                       <span style={{ fontSize: '0.78rem', color: '#8899aa', fontFamily: '"DM Mono", monospace' }}>
-                        {t.val}곡 <span style={{ opacity: 0.55 }}>/ 목표 {target}곡</span>{' '}
-                        <span style={{ color: perfect ? '#00e87a' : over ? '#ffd60a' : '#556070' }}>
-                          {perfect ? '✓' : over ? `+${diff}` : diff}
-                        </span>
+                        {t.val}곡 <span style={{ opacity: 0.55 }}>/ 목표 {target}곡</span>
                       </span>
                     </div>
                     <div style={{ height: 4, borderRadius: 2, background: '#1c1c2c', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${fillPct}%`, background: t.color, opacity: over ? 0.6 : 1, transition: 'width 0.3s' }} />
+                      <div style={{ height: '100%', width: `${fillPct}%`, background: t.color, transition: 'width 0.3s' }} />
                     </div>
                     <div style={{ fontSize: '0.68rem', color: '#556070', fontFamily: '"DM Mono", monospace', marginTop: 3 }}>
-                      현재 {pct}% <span style={{ opacity: 0.5 }}>(목표 {targetPct}%)</span>
+                      현재 {curPct}% <span style={{ opacity: 0.5 }}>(목표 {targetPct}%)</span>
                     </div>
                   </div>
                 );
               })}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, marginTop: 6, borderTop: '1px solid #1c1c2c' }}>
+                <span style={{ fontSize: '0.82rem', color: '#556070' }}>미분류</span>
+                <span style={{ fontSize: '0.85rem', color: '#556070', fontFamily: '"DM Mono", monospace', fontWeight: 500 }}>{untiered.length}곡</span>
+              </div>
+            </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, marginTop: 6, borderTop: '1px solid #1c1c2c' }}>
                 <span style={{ fontSize: '0.82rem', color: '#556070' }}>미분류</span>
