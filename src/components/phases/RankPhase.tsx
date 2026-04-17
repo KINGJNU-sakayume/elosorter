@@ -14,11 +14,11 @@ export default function RankPhase() {
   const c2 = tracks.filter(t => t.tier === 2).length;
   const c3 = tracks.filter(t => t.tier === 3).length;
 
-  const tierColors: Record<number, string> = { 1: '#ffd60a', 2: '#4cc9f0', 3: '#7c8fa6' };
-  const tierBgColors: Record<number, string> = { 1: 'rgba(255,214,10,0.12)', 2: 'rgba(76,201,240,0.12)', 3: 'rgba(124,143,166,0.1)' };
+  const tierColors: Record<number, string> = { 1: 'var(--tier-1)', 2: 'var(--tier-2)', 3: 'var(--tier-3)' };
+  const tierBgColors: Record<number, string> = { 1: 'var(--tier-1-soft)', 2: 'var(--tier-2-soft)', 3: 'var(--tier-3-soft)' };
   const tierLabels: Record<number, string> = { 1: '💛 Tier 1 — 최애', 2: '👍 Tier 2 — 선호', 3: '🎵 Tier 3 — 보통' };
 
-  const numColor = (r: number) => r === 1 ? '#ffd60a' : r === 2 ? '#b0bec5' : r === 3 ? '#ff8a65' : '#556070';
+  const numColor = (r: number) => r === 1 ? 'var(--tier-1)' : r === 2 ? 'var(--rank-2)' : r === 3 ? 'var(--rank-3)' : 'var(--text-tertiary)';
   const numSize = (r: number) => r <= 3 ? '0.9rem' : '0.85rem';
 
   let curTier: number | null = null;
@@ -28,13 +28,13 @@ export default function RankPhase() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 16 }}>
         <div>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 4 }}>🏆 랭킹</div>
-          <div style={{ fontSize: '0.82rem', color: '#8899aa' }}>
+          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
             {tracks.length}곡 · 비교 {compCount}회 · 최애: {c1}곡 / 선호: {c2}곡 / 보통: {c3}곡
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => dispatch({ type: 'SET_PHASE', payload: 'sort' })}
-            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #2a2a3e', background: 'transparent', color: '#8899aa', cursor: 'pointer', fontSize: '0.8rem' }}>
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8rem' }}>
             ⚔️ 계속 정렬
           </button>
         </div>
@@ -55,9 +55,9 @@ export default function RankPhase() {
             <a
               href={`https://open.spotify.com/track/${track.id}`}
               target="_blank" rel="noopener noreferrer"
-              style={{ background: '#14141f', border: '1px solid #2a2a3e', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6, transition: 'all 0.15s', textDecoration: 'none', color: 'inherit' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = '#3a3a54'; e.currentTarget.style.background = '#1c1c2c'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a3e'; e.currentTarget.style.background = '#14141f'; }}
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6, transition: 'all 0.15s', textDecoration: 'none', color: 'inherit' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.background = 'var(--bg-sub)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-card)'; }}
               aria-label={`${track.name} — Spotify에서 열기`}
             >
               <div style={{ fontFamily: '"DM Mono", monospace', fontSize: numSize(grank), color: numColor(grank), minWidth: 36, textAlign: 'right' }}>#{grank}</div>
@@ -66,15 +66,15 @@ export default function RankPhase() {
                 <div style={{ fontFamily: '"Instrument Serif", serif', fontStyle: 'italic', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {track.isNew && '✦ '}{track.name}
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#8899aa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {track.artists.join(', ')}{track.album ? ' · ' + track.album : ''}
                 </div>
               </div>
               {track.tier && (
                 <div style={{ padding: '2px 9px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, fontFamily: '"DM Mono", monospace', flexShrink: 0, background: tierBgColors[track.tier], color: tierColors[track.tier] }}>T{track.tier}</div>
               )}
-              <div style={{ fontFamily: '"DM Mono", monospace', fontSize: '0.88rem', color: '#00e87a', minWidth: 52, textAlign: 'right' }}>{Math.round(track.rating)}</div>
-              <div style={{ fontFamily: '"DM Mono", monospace', fontSize: '0.75rem', color: '#556070', minWidth: 32, textAlign: 'right' }} title={`${track.comparisons}회 비교`}>{track.comparisons}x</div>
+              <div style={{ fontFamily: '"DM Mono", monospace', fontSize: '0.88rem', color: 'var(--accent)', minWidth: 52, textAlign: 'right' }}>{Math.round(track.rating)}</div>
+              <div style={{ fontFamily: '"DM Mono", monospace', fontSize: '0.75rem', color: 'var(--text-tertiary)', minWidth: 32, textAlign: 'right' }} title={`${track.comparisons}회 비교`}>{track.comparisons}x</div>
             </a>
           </div>
         );
