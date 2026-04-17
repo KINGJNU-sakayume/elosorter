@@ -253,12 +253,6 @@ export default function TierPhase({ player }: Props) {
                 <span style={{ fontSize: '0.85rem', color: '#556070', fontFamily: '"DM Mono", monospace', fontWeight: 500 }}>{untiered.length}곡</span>
               </div>
             </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, marginTop: 6, borderTop: '1px solid #1c1c2c' }}>
-                <span style={{ fontSize: '0.82rem', color: '#556070' }}>미분류</span>
-                <span style={{ fontSize: '0.85rem', color: '#556070', fontFamily: '"DM Mono", monospace', fontWeight: 500 }}>{untiered.length}곡</span>
-              </div>
-            </div>
           </div>
         </div>
       )}
