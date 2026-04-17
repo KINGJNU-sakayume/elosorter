@@ -11,6 +11,7 @@ declare global {
       }) => SpotifyPlayerInstance;
     };
     onSpotifyWebPlaybackSDKReady: () => void;
+    __spotifySdkReady?: boolean;
   }
 }
 
@@ -41,6 +42,7 @@ export function useSpotifyPlayer(getToken: () => Promise<string | null>) {
     const init = async () => {
       const token = await getToken();
       if (!token) { setPs(s => ({ ...s, sdkFailed: true })); return; }
+      if (!window.Spotify) { setPs(s => ({ ...s, sdkFailed: true })); return; }
 
       const player = new window.Spotify.Player({
         name: 'ELO Sorter',
@@ -65,13 +67,18 @@ export function useSpotifyPlayer(getToken: () => Promise<string | null>) {
       playerRef.current = player;
     };
 
+    // SDK 로드 상태에 따라 즉시 init 하거나 이벤트를 기다림
+    // (index.html에서 onSpotifyWebPlaybackSDKReady가 spotify-sdk-ready 이벤트를 디스패치하도록 선점돼 있음)
     if (window.Spotify) {
       init();
     } else {
-      window.onSpotifyWebPlaybackSDKReady = init;
+      window.addEventListener('spotify-sdk-ready', init, { once: true });
     }
 
-    return () => { playerRef.current?.disconnect(); };
+    return () => {
+      window.removeEventListener('spotify-sdk-ready', init);
+      playerRef.current?.disconnect();
+    };
   }, []);
 
   const play = useCallback(async (uri: string) => {

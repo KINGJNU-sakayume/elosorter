@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { loadConfig } from '../utils/config';
 
 const SCOPES = [
@@ -31,13 +31,27 @@ function storeTokens(data: Record<string, unknown>) {
 }
 
 export function useSpotifyAuth() {
-  const isLoggedIn = useCallback((): boolean => {
-    return !!localStorage.getItem('spotify_access_token');
+  // localStorage만 읽으면 React가 변화를 감지 못 하므로 상태로 관리
+  const [authed, setAuthed] = useState<boolean>(
+    () => !!localStorage.getItem('spotify_access_token')
+  );
+
+  const isLoggedIn = useCallback((): boolean => authed, [authed]);
+
+  const logout = useCallback(() => {
+    ['spotify_access_token', 'spotify_refresh_token', 'spotify_token_expires'].forEach(k =>
+      localStorage.removeItem(k)
+    );
+    setAuthed(false);
   }, []);
 
   const login = useCallback(async () => {
     const cfg = loadConfig();
-    if (!cfg.clientId) return false;
+    if (!cfg.clientId) {
+      console.warn('[Spotify] Client ID가 설정되지 않았습니다.');
+      alert('Spotify Client ID가 설정되지 않았습니다.');
+      return false;
+    }
     const { verifier, challenge } = await generatePKCE();
     sessionStorage.setItem('pkce_verifier', verifier);
     const params = new URLSearchParams({
@@ -67,10 +81,14 @@ export function useSpotifyAuth() {
         code_verifier: verifier,
       }),
     });
-    if (!res.ok) return false;
+    if (!res.ok) {
+      console.error('[Spotify] Token 교환 실패:', await res.text());
+      return false;
+    }
     storeTokens(await res.json());
     sessionStorage.removeItem('pkce_verifier');
     window.history.replaceState({}, '', window.location.pathname);
+    setAuthed(true);  // 🔑 React에게 로그인 성공을 알려 리렌더링 유발
     return true;
   }, []);
 
@@ -95,13 +113,7 @@ export function useSpotifyAuth() {
     const data = await res.json();
     storeTokens({ ...data, refresh_token: data.refresh_token || refresh });
     return data.access_token;
-  }, []);
-
-  const logout = useCallback(() => {
-    ['spotify_access_token', 'spotify_refresh_token', 'spotify_token_expires'].forEach(k =>
-      localStorage.removeItem(k)
-    );
-  }, []);
+  }, [logout]);
 
   return { isLoggedIn, login, handleCallback, getToken, logout };
 }
