@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  background: #090912;
+  color: #f0f0f8;
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0f0f1a; }
+::-webkit-scrollbar-thumb { background: #3a3a54; border-radius: 3px; }
+
+#toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%);
+  background: #242436; border: 1px solid #3a3a54;
+  border-radius: 10px; padding: 10px 20px;
+  font-size: 0.875rem; pointer-events: none;
+  opacity: 0; transition: opacity 0.25s;
+  z-index: 999; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+
+@keyframes eqPulse { from { height: 3px; opacity: 0.6; } to { height: 14px; opacity: 1; } }
+.eq-bar { width: 3px; border-radius: 2px; background: #00e87a; min-height: 3px; animation: eqPulse 0.7s ease-in-out infinite alternate; }
+.eq-bar:nth-child(1) { animation-duration: 0.65s; }
+.eq-bar:nth-child(2) { animation-duration: 0.8s; animation-delay: 0.12s; }
+.eq-bar:nth-child(3) { animation-duration: 0.55s; animation-delay: 0.06s; }
+.eq-bar:nth-child(4) { animation-duration: 0.9s; animation-delay: 0.2s; }
+.eq-bar:nth-child(5) { animation-duration: 0.7s; animation-delay: 0.04s; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes slideIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+.animate-in { animation: slideIn 0.2s ease; }
+.animate-fade { animation: fadeIn 0.4s ease; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #3a3a54; border-top-color: #00e87a; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }

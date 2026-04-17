@@ -1,0 +1,95 @@
+import { useEffect, useRef, useState, useCallback } from 'react';
+import type { PlayerState } from '../utils/types';
+
+declare global {
+  interface Window {
+    Spotify: {
+      Player: new (opts: {
+        name: string;
+        getOAuthToken: (cb: (t: string) => void) => void;
+        volume: number;
+      }) => SpotifyPlayerInstance;
+    };
+    onSpotifyWebPlaybackSDKReady: () => void;
+  }
+}
+
+interface SpotifyPlayerInstance {
+  connect: () => Promise<boolean>;
+  disconnect: () => void;
+  pause: () => Promise<void>;
+  resume: () => Promise<void>;
+  addListener: (event: string, cb: (data: unknown) => void) => void;
+}
+
+export function useSpotifyPlayer(getToken: () => Promise<string | null>) {
+  const playerRef = useRef<SpotifyPlayerInstance | null>(null);
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  const [ps, setPs] = useState<PlayerState>({
+    ready: false,
+    deviceId: null,
+    isPlaying: false,
+    currentUri: null,
+    isMobile,
+    sdkFailed: isMobile,
+  });
+
+  useEffect(() => {
+    if (isMobile) return;
+
+    const init = async () => {
+      const token = await getToken();
+      if (!token) { setPs(s => ({ ...s, sdkFailed: true })); return; }
+
+      const player = new window.Spotify.Player({
+        name: 'ELO Sorter',
+        getOAuthToken: async (cb) => { const t = await getToken(); if (t) cb(t); },
+        volume: 0.8,
+      });
+
+      player.addListener('ready', (data) => {
+        const { device_id } = data as { device_id: string };
+        setPs(s => ({ ...s, ready: true, deviceId: device_id }));
+      });
+      player.addListener('not_ready', () => setPs(s => ({ ...s, ready: false, deviceId: null })));
+      player.addListener('initialization_error', () => setPs(s => ({ ...s, sdkFailed: true })));
+      player.addListener('authentication_error', () => setPs(s => ({ ...s, sdkFailed: true })));
+      player.addListener('player_state_changed', (state) => {
+        if (!state) return;
+        const st = state as { paused: boolean; track_window: { current_track: { uri: string } } };
+        setPs(s => ({ ...s, isPlaying: !st.paused, currentUri: st.track_window?.current_track?.uri ?? null }));
+      });
+
+      await player.connect();
+      playerRef.current = player;
+    };
+
+    if (window.Spotify) {
+      init();
+    } else {
+      window.onSpotifyWebPlaybackSDKReady = init;
+    }
+
+    return () => { playerRef.current?.disconnect(); };
+  }, []);
+
+  const play = useCallback(async (uri: string) => {
+    if (!ps.deviceId) return;
+    const token = await getToken();
+    if (!token) return;
+    await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${ps.deviceId}`, {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uris: [uri] }),
+    });
+  }, [ps.deviceId, getToken]);
+
+  const pause = useCallback(() => playerRef.current?.pause(), []);
+  const resume = useCallback(() => playerRef.current?.resume(), []);
+  const toggle = useCallback(() => {
+    if (ps.isPlaying) pause(); else resume();
+  }, [ps.isPlaying, pause, resume]);
+
+  return { ...ps, play, pause, resume, toggle };
+}
