@@ -87,7 +87,10 @@ export async function fetchPlaylists(getToken: () => Promise<string | null>): Pr
   let next: string | null = '/me/playlists?limit=50';
   while (next) {
     const data = await spotifyGet(next, getToken);
-    results.push(...(data.items as SpotifyPlaylist[]).filter(Boolean));
+    const items = (data.items as (SpotifyPlaylist | null)[])
+      // Spotify는 가끔 null 또는 필드가 빠진 플레이리스트를 섞어서 돌려줌 (알고리즘 플레이리스트 등)
+      .filter((p): p is SpotifyPlaylist => !!(p && p.id && p.name));
+    results.push(...items);
     next = data.next ? (data.next as string).replace('https://api.spotify.com/v1', '') : null;
   }
   return results;

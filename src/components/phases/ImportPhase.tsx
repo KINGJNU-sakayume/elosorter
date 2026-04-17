@@ -233,7 +233,7 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
                   <img src={pl.images?.[0]?.url || ''} alt="" style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', background: '#242436', flexShrink: 0 }} onError={e => (e.currentTarget.style.display = 'none')} />
                   <div>
                     <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f0f0f8' }}>{pl.name}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#8899aa', marginTop: 2 }}>{pl.tracks.total}곡</div>
+                    <div style={{ fontSize: '0.78rem', color: '#8899aa', marginTop: 2 }}>{pl.tracks?.total ?? 0}곡</div>
                   </div>
                 </button>
               ))}
