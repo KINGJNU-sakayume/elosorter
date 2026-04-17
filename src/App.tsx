@@ -16,8 +16,7 @@ export default function App() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // 전역 단축키: Ctrl+, (Mac: Cmd+,) → 설정 모달 열기
-  // UI에서 설정 버튼을 제거했지만, env 주입이 실패했을 때 수동 입력용 탈출구로 남겨둠
+  // 전역 단축키: Ctrl+, (Mac: Cmd+,) → 설정 모달 토글
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === ',') {
@@ -32,7 +31,7 @@ export default function App() {
   const { phase } = state;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#090912', color: '#f0f0f8', fontFamily: '"DM Sans", sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-page)', color: 'var(--text-primary)', fontFamily: '"DM Sans", sans-serif' }}>
       <Header />
       {phase === 'import' && <ImportPhase />}
       {phase === 'tier'   && <TierPhase player={player} />}
