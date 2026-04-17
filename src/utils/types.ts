@@ -29,6 +29,7 @@ export interface AppState {
   isChoosing: boolean;
   user: SpotifyUser | null;
   pendingNewTracks: Track[];
+  pendingRemovedIds: string[];   // 🆕 Spotify에서 제거된 곡 ID들
 }
 
 export type AppAction =
@@ -41,6 +42,9 @@ export type AppAction =
   | { type: 'CHOOSE_DONE'; payload: ChooseDonePayload }
   | { type: 'SET_PENDING_NEW'; payload: Track[] }
   | { type: 'ABSORB_NEW' }
+  | { type: 'SET_PENDING_REMOVED'; payload: string[] }   // 🆕
+  | { type: 'APPLY_REMOVAL' }                            // 🆕 실제로 삭제
+  | { type: 'DISMISS_REMOVAL' }                          // 🆕 유지 (로컬에 남김)
   | { type: 'LOAD_STATE'; payload: Partial<Omit<AppState, 'seenPairs'> & { seenPairs: string[] }> }
   | { type: 'RESET' };
 
