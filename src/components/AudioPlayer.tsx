@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Track, PlayerState } from '../utils/types';
+import type { Track } from '../utils/types';
 
 type PlayMode = 'preview' | 'full';
 
