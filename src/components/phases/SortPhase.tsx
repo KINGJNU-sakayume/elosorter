@@ -4,9 +4,9 @@ import { useKeyboard } from '../../hooks/useKeyboard';
 import { computeElo, pairKey, getNextPair, computeRSI } from '../../utils/elo';
 import { loadConfig, saveState } from '../../utils/config';
 import { saveToSupabase } from '../../utils/supabase';
-import { fetchTrackDetails } from '../../utils/spotify';
+import { fetchTrackDurations } from '../../utils/spotify';
 import { useSpotifyAuth } from '../../hooks/useSpotifyAuth';
-import AudioPlayer, { loadPlayMode } from '../AudioPlayer';
+import AudioPlayer from '../AudioPlayer';
 import type { PlayerState, Track } from '../../utils/types';
 
 interface Props {
@@ -28,13 +28,11 @@ interface CmpCardProps {
   track: Track;
   onClick: () => void;
   locked: boolean;
-  coverClickable: boolean;        // 🆕 빠른 비교 모드에서만 앨범 클릭 허용
-  playMode: 'preview' | 'full';
-  onPlayModeChange: (m: 'preview' | 'full') => void;
+  coverClickable: boolean;        // 빠른 비교 모드에서만 앨범 클릭 허용
   fullPlayer: PlayerState & { play: (uri: string) => Promise<void>; toggle: () => void };
 }
 
-function CmpCard({ track, onClick, locked, coverClickable, playMode, onPlayModeChange, fullPlayer }: CmpCardProps) {
+function CmpCard({ track, onClick, locked, coverClickable, fullPlayer }: CmpCardProps) {
   const fullIsCurrent = fullPlayer.currentUri === (track.uri || `spotify:track:${track.id}`);
   const canClickCover = coverClickable && !locked;
   return (
@@ -82,9 +80,7 @@ function CmpCard({ track, onClick, locked, coverClickable, playMode, onPlayModeC
 
         <AudioPlayer
           track={track}
-          mode={playMode}
-          onModeChange={onPlayModeChange}
-          fullPlayer={{ ...fullPlayer }}
+          fullPlayer={fullPlayer}
           fullIsCurrent={fullIsCurrent}
         />
       </div>
@@ -103,7 +99,6 @@ export default function SortPhase({ player }: Props) {
   const B = curPair?.[1];
   const isFineMode = A && B ? Math.abs(A.rating - B.rating) < FINE_MODE_THRESHOLD : false;
 
-  const [playMode, setPlayMode] = useState<'preview' | 'full'>(loadPlayMode());
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [lastSavedCount, setLastSavedCount] = useState(compCount);
@@ -120,26 +115,21 @@ export default function SortPhase({ player }: Props) {
     });
   }, [player]);
 
-  // 현재 쌍에 대한 preview_url / duration_ms 보강
-  // previewUrl이 undefined이거나 durationMs가 없거나 0이면 보강
+  // 현재 쌍에 대한 duration 보강 (durationMs가 없는 레거시 곡만 대상)
   const enrichedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!A || !B) return;
-    const needsEnrich = (t: Track) => {
-      if (enrichedRef.current.has(t.id)) return false;
-      const noPreview = t.previewUrl === undefined;
-      const noDuration = !t.durationMs;
-      return noPreview || noDuration;
-    };
     const need: string[] = [];
-    if (needsEnrich(A)) need.push(A.id);
-    if (needsEnrich(B)) need.push(B.id);
+    for (const t of [A, B]) {
+      if (enrichedRef.current.has(t.id)) continue;
+      if (!t.durationMs) need.push(t.id);
+    }
     if (!need.length) return;
     need.forEach(id => enrichedRef.current.add(id));
-    fetchTrackDetails(need, getToken)
+    fetchTrackDurations(need, getToken)
       .then(details => { if (details.length) dispatch({ type: 'ENRICH_TRACKS', payload: details }); })
       .catch(e => { console.warn('[SortPhase] 트랙 보강 실패:', e); });
-  }, [A?.id, B?.id, A?.durationMs, B?.durationMs, getToken, dispatch]);
+  }, [A?.id, B?.id, getToken, dispatch]);
 
   // 저장
   const savingRef = useRef(false);
@@ -341,8 +331,6 @@ export default function SortPhase({ player }: Props) {
           onClick={() => handleChoose(1.0)}
           locked={isChoosing}
           coverClickable={!isFineMode}
-          playMode={playMode}
-          onPlayModeChange={setPlayMode}
           fullPlayer={player}
         />
         <CmpCard
@@ -350,8 +338,6 @@ export default function SortPhase({ player }: Props) {
           onClick={() => handleChoose(0.0)}
           locked={isChoosing}
           coverClickable={!isFineMode}
-          playMode={playMode}
-          onPlayModeChange={setPlayMode}
           fullPlayer={player}
         />
       </div>

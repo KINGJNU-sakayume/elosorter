@@ -10,9 +10,7 @@ export interface Track {
   rating: number;
   comparisons: number;
   isNew: boolean;
-  // 🆕 재생 지원
-  previewUrl?: string | null;   // Spotify 30초 프리뷰 URL (null이면 제공 안 됨)
-  durationMs?: number;           // 곡 길이 (밀리초)
+  durationMs?: number;
 }
 
 export type Phase = 'import' | 'tier' | 'sort' | 'rank';
@@ -61,7 +59,7 @@ export type AppAction =
   | { type: 'SET_PENDING_REMOVED'; payload: string[] }
   | { type: 'APPLY_REMOVAL' }
   | { type: 'DISMISS_REMOVAL' }
-  | { type: 'ENRICH_TRACKS'; payload: { id: string; previewUrl: string | null; durationMs: number }[] }   // 🆕 곡 정보 보강
+  | { type: 'ENRICH_TRACKS'; payload: { id: string; durationMs: number }[] }   // 🆕 곡 정보 보강 (duration)
   | { type: 'LOAD_STATE'; payload: Partial<Omit<AppState, 'seenPairs'> & { seenPairs: string[] }> }
   | { type: 'RESET' };
 
