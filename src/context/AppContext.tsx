@@ -139,7 +139,20 @@ function reducer(state: AppState, action: AppAction): AppState {
         if (!e) return t;
         return { ...t, durationMs: e.durationMs };
       });
-      return { ...state, tracks };
+      // curPair가 보강 대상을 참조 중이면 같이 갱신해야 UI가 새 duration을 표시함
+      let curPair = state.curPair;
+      if (curPair) {
+        const [a, b] = curPair;
+        const ea = enrichMap.get(a.id);
+        const eb = enrichMap.get(b.id);
+        if (ea || eb) {
+          curPair = [
+            ea ? { ...a, durationMs: ea.durationMs } : a,
+            eb ? { ...b, durationMs: eb.durationMs } : b,
+          ];
+        }
+      }
+      return { ...state, tracks, curPair };
     }
 
     case 'LOAD_STATE': {
