@@ -49,7 +49,6 @@ export default function AudioPlayer({ track, mode, onModeChange, fullPlayer, ful
   const hasPreview = !!track.previewUrl;
   const effectiveMode: PlayMode = (mode === 'preview' && !hasPreview) ? 'full' : mode;
 
-  // 트랙이 바뀌면 프리뷰 정지 + 처음부터 재설정
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
@@ -59,7 +58,6 @@ export default function AudioPlayer({ track, mode, onModeChange, fullPlayer, ful
     setPreviewCurrent(0);
   }, [track.id]);
 
-  // 언마운트시에도 정지
   useEffect(() => {
     return () => {
       const a = audioRef.current;
@@ -101,11 +99,12 @@ export default function AudioPlayer({ track, mode, onModeChange, fullPlayer, ful
   const dur = audioRef.current?.duration || 30;
   const previewProgressPct = (previewCurrent / dur) * 100;
   const previewTimeLabel = `${fmtTime(previewCurrent * 1000)} / ${fmtTime(dur * 1000)}`;
-  const trackTotalLabel = fmtTime(track.durationMs ?? 0);
+
+  // 🆕 duration 정보가 실제로 있을 때만 재생시간 표시
+  const hasDuration = !!(track.durationMs && track.durationMs > 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {/* 숨겨진 audio 요소 — key로 트랙마다 새 DOM 요소를 만들어 재생 누수 방지 */}
       {hasPreview && (
         <audio
           key={track.id}
@@ -119,7 +118,6 @@ export default function AudioPlayer({ track, mode, onModeChange, fullPlayer, ful
         />
       )}
 
-      {/* 재생 컨트롤 + 진행바/상태 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button
           onClick={toggle}
@@ -163,14 +161,16 @@ export default function AudioPlayer({ track, mode, onModeChange, fullPlayer, ful
                   ? 'Spotify 플레이어 준비 중…'
                   : (isPlaying ? '재생 중' : '일시정지됨')}
             </div>
-            <div style={{ fontSize: '0.72rem', fontFamily: '"DM Mono", monospace', color: 'var(--text-tertiary)', minWidth: 44, textAlign: 'right', whiteSpace: 'nowrap' }}>
-              {trackTotalLabel}
-            </div>
+            {/* 🆕 duration이 실제로 있을 때만 표시 */}
+            {hasDuration && (
+              <div style={{ fontSize: '0.72rem', fontFamily: '"DM Mono", monospace', color: 'var(--text-tertiary)', minWidth: 44, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                {fmtTime(track.durationMs!)}
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {/* 모드 토글 */}
       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
         <button
           onClick={() => changeMode('preview')}
