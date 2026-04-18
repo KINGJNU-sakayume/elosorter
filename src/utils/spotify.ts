@@ -17,6 +17,8 @@ export function trackFromItem(item: Record<string, unknown>): Track | null {
     rating: 1500,
     comparisons: 0,
     isNew: false,
+    previewUrl: (t.preview_url as string | null) ?? null,
+    durationMs: (t.duration_ms as number) ?? 0,
   };
 }
 
@@ -88,10 +90,33 @@ export async function fetchPlaylists(getToken: () => Promise<string | null>): Pr
   while (next) {
     const data = await spotifyGet(next, getToken);
     const items = (data.items as (SpotifyPlaylist | null)[])
-      // Spotify는 가끔 null 또는 필드가 빠진 플레이리스트를 섞어서 돌려줌 (알고리즘 플레이리스트 등)
       .filter((p): p is SpotifyPlaylist => !!(p && p.id && p.name));
     results.push(...items);
     next = data.next ? (data.next as string).replace('https://api.spotify.com/v1', '') : null;
+  }
+  return results;
+}
+
+/**
+ * 여러 곡의 preview_url과 duration_ms를 한 번에 가져옴
+ * Spotify /tracks endpoint는 한 번에 최대 50개 ID를 받음
+ * 이미 저장된 트랙들에 preview 정보가 없을 때 보강용
+ */
+export async function fetchTrackDetails(
+  trackIds: string[],
+  getToken: () => Promise<string | null>
+): Promise<{ id: string; previewUrl: string | null; durationMs: number }[]> {
+  const results: { id: string; previewUrl: string | null; durationMs: number }[] = [];
+  // 50개씩 청크
+  for (let i = 0; i < trackIds.length; i += 50) {
+    const chunk = trackIds.slice(i, i + 50);
+    const data = await spotifyGet(`/tracks?ids=${chunk.join(',')}`, getToken);
+    const tracks = data.tracks as ({ id: string; preview_url: string | null; duration_ms: number } | null)[];
+    for (const t of tracks) {
+      if (t?.id) {
+        results.push({ id: t.id, previewUrl: t.preview_url, durationMs: t.duration_ms });
+      }
+    }
   }
   return results;
 }

@@ -10,10 +10,23 @@ export interface Track {
   rating: number;
   comparisons: number;
   isNew: boolean;
+  // 🆕 재생 지원
+  previewUrl?: string | null;   // Spotify 30초 프리뷰 URL (null이면 제공 안 됨)
+  durationMs?: number;           // 곡 길이 (밀리초)
 }
 
 export type Phase = 'import' | 'tier' | 'sort' | 'rank';
 export type Source = 'liked' | string;
+
+// 🆕 비교 되돌리기용 스냅샷
+export interface SortHistoryEntry {
+  trackA: Track;         // 비교 전 A 상태
+  trackB: Track;         // 비교 전 B 상태
+  rsiDelta: number;      // 이 비교가 만든 rsi 변동분
+  pairKey: string;       // 이 쌍의 key
+  prevCurPair: [Track, Track] | null;  // 이 비교 전에 제시됐던 curPair
+  prevLastPairKey: string;
+}
 
 export interface AppState {
   phase: Phase;
@@ -29,7 +42,9 @@ export interface AppState {
   isChoosing: boolean;
   user: SpotifyUser | null;
   pendingNewTracks: Track[];
-  pendingRemovedIds: string[];   // 🆕 Spotify에서 제거된 곡 ID들
+  pendingRemovedIds: string[];
+  // 🆕 비교 정렬 되돌리기 스택
+  sortHistory: SortHistoryEntry[];
 }
 
 export type AppAction =
@@ -40,11 +55,13 @@ export type AppAction =
   | { type: 'UNDO_TIER' }
   | { type: 'CHOOSE_START' }
   | { type: 'CHOOSE_DONE'; payload: ChooseDonePayload }
+  | { type: 'UNDO_CHOOSE' }                                        // 🆕 비교 되돌리기
   | { type: 'SET_PENDING_NEW'; payload: Track[] }
   | { type: 'ABSORB_NEW' }
-  | { type: 'SET_PENDING_REMOVED'; payload: string[] }   // 🆕
-  | { type: 'APPLY_REMOVAL' }                            // 🆕 실제로 삭제
-  | { type: 'DISMISS_REMOVAL' }                          // 🆕 유지 (로컬에 남김)
+  | { type: 'SET_PENDING_REMOVED'; payload: string[] }
+  | { type: 'APPLY_REMOVAL' }
+  | { type: 'DISMISS_REMOVAL' }
+  | { type: 'ENRICH_TRACKS'; payload: { id: string; previewUrl: string | null; durationMs: number }[] }   // 🆕 곡 정보 보강
   | { type: 'LOAD_STATE'; payload: Partial<Omit<AppState, 'seenPairs'> & { seenPairs: string[] }> }
   | { type: 'RESET' };
 
@@ -55,6 +72,11 @@ export interface ChooseDonePayload {
   newPairKey: string;
   nextPair: [Track, Track] | null;
   newSeenPairs: Set<string>;
+  // 🆕 undo를 위한 비교 전 상태
+  prevA: Track;
+  prevB: Track;
+  prevCurPair: [Track, Track] | null;
+  prevLastPairKey: string;
 }
 
 export interface SpotifyUser {
