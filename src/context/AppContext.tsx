@@ -132,12 +132,12 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, pendingRemovedIds: [] };
 
     case 'ENRICH_TRACKS': {
-      // 곡들에 previewUrl, durationMs 추가 (기존 값 유지)
+      // 곡들에 durationMs 추가 (기존 값 유지)
       const enrichMap = new Map(action.payload.map(e => [e.id, e]));
       const tracks = state.tracks.map(t => {
         const e = enrichMap.get(t.id);
         if (!e) return t;
-        return { ...t, previewUrl: e.previewUrl, durationMs: e.durationMs };
+        return { ...t, durationMs: e.durationMs };
       });
       return { ...state, tracks };
     }
