@@ -41,20 +41,35 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
     }
   }, []);
 
-  // Load user profile
+  // Load user profile, then check cloud session (순서 중요: cloud check는 userId 필요)
   useEffect(() => {
     if (!isLoggedIn()) return;
-    getToken().then(token => {
-      if (!token) return;
-      fetch('https://api.spotify.com/v1/me', { headers: { Authorization: 'Bearer ' + token } })
-        .then(r => r.json())
-        .then(me => {
-          const u: SpotifyUser = { id: me.id, display_name: me.display_name || me.id, email: me.email || '', imageUrl: me.images?.[0]?.url || '' };
-          setUser(u);
-          dispatch({ type: 'SET_USER', payload: u });
+    (async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch('https://api.spotify.com/v1/me', {
+          headers: { Authorization: 'Bearer ' + token },
         });
-    });
-    checkCloudSession(cfg).then(setCloudInfo);
+        if (!res.ok) throw new Error('프로필 조회 실패: ' + res.status);
+        const me = await res.json();
+        const u: SpotifyUser = {
+          id: me.id,
+          display_name: me.display_name || me.id,
+          email: me.email || '',
+          imageUrl: me.images?.[0]?.url || '',
+        };
+        setUser(u);
+        dispatch({ type: 'SET_USER', payload: u });
+
+        // 사용자별 클라우드 행 조회
+        const cloud = await checkCloudSession(cfg, u.id);
+        setCloudInfo(cloud);
+      } catch (e) {
+        console.warn('[ImportPhase] 초기화 실패:', e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn()]);
 
   // expose sync function
@@ -130,7 +145,8 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
   }
 
   async function handleLoadCloud() {
-    const res = await loadFromSupabase(cfg);
+    if (!user?.id) { showToast('⚠️ Spotify 로그인이 필요합니다'); return; }
+    const res = await loadFromSupabase(cfg, user.id);
     if (!res) { showToast('☁️ 저장된 데이터 없음'); return; }
     dispatch({ type: 'LOAD_STATE', payload: res.data });
     showToast(`☁️ ${res.data.tracks?.length ?? 0}곡 불러오기 완료`);
@@ -301,7 +317,12 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={handleLoadCloud} style={S.btn('green')}>클라우드에서 불러오기</button>
-              <button onClick={async () => { await deleteCloudSession(cfg); setCloudInfo({ exists: false }); showToast('🗑️ 삭제됨'); }} style={S.btn('outline')}>초기화</button>
+              <button onClick={async () => {
+                if (!user?.id) { showToast('⚠️ 로그인 필요'); return; }
+                await deleteCloudSession(cfg, user.id);
+                setCloudInfo({ exists: false });
+                showToast('🗑️ 삭제됨');
+              }} style={S.btn('outline')}>초기화</button>
             </div>
           </div>
         ) : (

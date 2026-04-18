@@ -39,15 +39,17 @@ export default function TierPhase({ player }: Props) {
 
   // 저장 함수 (중복 호출 방지용 ref)
   const savingRef = useRef(false);
-  const runCloudSave = useCallback(async (reason: 'auto' | 'manual' | 'done') => {
+ const runCloudSave = useCallback(async (reason: 'auto' | 'manual' | 'done') => {
     if (savingRef.current) return;
     if (!cfg.supabaseUrl || !cfg.anonKey) return; // supabase 미설정이면 조용히 skip
+    const userId = state.user?.id;
+    if (!userId) return; // 로그인 전이면 skip
     savingRef.current = true;
     setSaveStatus('saving');
     const data = { tracks: state.tracks, compCount: state.compCount, rsiDeltas: state.rsiDeltas, currentSource: state.currentSource };
     const currentDone = state.tracks.filter(t => t.tier !== null).length;
     try {
-      const r = await saveToSupabase(data, cfg);
+      const r = await saveToSupabase(data, cfg, userId);
       setSaveStatus(r.ok ? 'ok' : 'error');
       if (r.ok) {
         setLastSavedAt(new Date());

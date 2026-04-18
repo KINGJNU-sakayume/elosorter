@@ -146,12 +146,14 @@ export default function SortPhase({ player }: Props) {
   const runCloudSave = useCallback(async (reason: 'auto' | 'manual') => {
     if (savingRef.current) return;
     if (!cfg.supabaseUrl || !cfg.anonKey) return;
+    const userId = state.user?.id;
+    if (!userId) return;  // 로그인 전이면 클라우드 저장 skip (로컬 저장은 유지됨)
     savingRef.current = true;
     setSaveStatus('saving');
     const data = { tracks: state.tracks, compCount: state.compCount, rsiDeltas: state.rsiDeltas, currentSource: state.currentSource };
     const curCompCount = state.compCount;
     try {
-      const r = await saveToSupabase(data, cfg);
+      const r = await saveToSupabase(data, cfg, userId);
       setSaveStatus(r.ok ? 'ok' : 'error');
       if (r.ok) {
         setLastSavedAt(new Date());
