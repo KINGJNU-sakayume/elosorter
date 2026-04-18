@@ -53,7 +53,12 @@ export function useSpotifyAuth() {
       return false;
     }
     const { verifier, challenge } = await generatePKCE();
+    // CSRF 방어용 랜덤 state (PKCE와 별개)
+    const state = base64url(
+      crypto.getRandomValues(new Uint8Array(16)).buffer as ArrayBuffer
+    );
     sessionStorage.setItem('pkce_verifier', verifier);
+    sessionStorage.setItem('pkce_state', state);
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: cfg.clientId,
@@ -61,6 +66,7 @@ export function useSpotifyAuth() {
       redirect_uri: cfg.redirectUri,
       code_challenge_method: 'S256',
       code_challenge: challenge,
+      state,
     });
     window.location.href = 'https://accounts.spotify.com/authorize?' + params;
     return true;
@@ -69,7 +75,27 @@ export function useSpotifyAuth() {
   const handleCallback = useCallback(async (code: string): Promise<boolean> => {
     const cfg = loadConfig();
     const verifier = sessionStorage.getItem('pkce_verifier');
-    if (!verifier) return false;
+    const savedState = sessionStorage.getItem('pkce_state');
+    const returnedState = new URLSearchParams(window.location.search).get('state');
+
+    // 실패·성공 모두에서 과도기 상태(verifier/state/URL 쿼리) 정리
+    const cleanup = () => {
+      sessionStorage.removeItem('pkce_verifier');
+      sessionStorage.removeItem('pkce_state');
+      window.history.replaceState({}, '', window.location.pathname);
+    };
+
+    if (!verifier) {
+      cleanup();
+      return false;
+    }
+    // state 검증 — 불일치 시 CSRF 가능성으로 즉시 중단
+    if (!savedState || !returnedState || savedState !== returnedState) {
+      console.error('[Spotify] state 불일치 — 로그인 중단');
+      cleanup();
+      return false;
+    }
+
     const res = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -83,11 +109,11 @@ export function useSpotifyAuth() {
     });
     if (!res.ok) {
       console.error('[Spotify] Token 교환 실패:', await res.text());
+      cleanup();
       return false;
     }
     storeTokens(await res.json());
-    sessionStorage.removeItem('pkce_verifier');
-    window.history.replaceState({}, '', window.location.pathname);
+    cleanup();
     setAuthed(true);  // 🔑 React에게 로그인 성공을 알려 리렌더링 유발
     return true;
   }, []);
