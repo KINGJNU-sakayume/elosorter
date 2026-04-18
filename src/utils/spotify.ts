@@ -98,25 +98,91 @@ export async function fetchPlaylists(getToken: () => Promise<string | null>): Pr
 }
 
 /**
- * 여러 곡의 preview_url과 duration_ms를 한 번에 가져옴
- * Spotify /tracks endpoint는 한 번에 최대 50개 ID를 받음
- * 이미 저장된 트랙들에 preview 정보가 없을 때 보강용
+ * Spotify embed 페이지에서 preview URL을 추출
+ *
+ * 2024-11 API 변경으로 공식 API의 preview_url이 모두 null이 됨.
+ * 우회책: open.spotify.com/embed/track/{id}의 HTML 안에 있는
+ * audioPreview.url (mp3 URL)을 파싱.
+ *
+ * CORS 문제 때문에 다음 순서로 시도:
+ *   1) 직접 fetch
+ *   2) 공용 CORS 프록시(corsproxy.io) 경유
+ *   3) 둘 다 실패하면 null
+ */
+async function fetchPreviewFromEmbed(trackId: string): Promise<string | null> {
+  const embedUrl = `https://open.spotify.com/embed/track/${trackId}`;
+  const attempts = [
+    embedUrl,
+    `https://corsproxy.io/?${encodeURIComponent(embedUrl)}`,
+  ];
+
+  for (const url of attempts) {
+    try {
+      const res = await fetch(url, { credentials: 'omit' });
+      if (!res.ok) continue;
+      const html = await res.text();
+      // 임베드 HTML에는 __NEXT_DATA__ JSON에 audioPreview.url이 들어있음
+      // 다양한 형식을 커버하기 위해 여러 정규식을 시도
+      const patterns = [
+        /"audioPreview"\s*:\s*\{\s*"url"\s*:\s*"([^"]+)"/,
+        /"url"\s*:\s*"(https:\/\/p\.scdn\.co\/mp3-preview\/[^"]+)"/,
+      ];
+      for (const pat of patterns) {
+        const m = html.match(pat);
+        if (m && m[1]) {
+          // 이스케이프 해제
+          return m[1].replace(/\\u002F/g, '/').replace(/\\\//g, '/');
+        }
+      }
+    } catch {
+      // 다음 시도
+    }
+  }
+  return null;
+}
+
+/**
+ * 여러 곡의 preview URL과 duration_ms를 가져옴
+ *
+ * duration은 여전히 공식 API(/v1/tracks)에서 정상적으로 받을 수 있음.
+ * preview URL은 embed 파싱 방식으로 대체 (최대 동시 5개).
  */
 export async function fetchTrackDetails(
   trackIds: string[],
   getToken: () => Promise<string | null>
 ): Promise<{ id: string; previewUrl: string | null; durationMs: number }[]> {
-  const results: { id: string; previewUrl: string | null; durationMs: number }[] = [];
-  // 50개씩 청크
+  if (!trackIds.length) return [];
+
+  // 1) 공식 API로 duration_ms 가져오기 (50개씩)
+  const durations = new Map<string, number>();
   for (let i = 0; i < trackIds.length; i += 50) {
     const chunk = trackIds.slice(i, i + 50);
-    const data = await spotifyGet(`/tracks?ids=${chunk.join(',')}`, getToken);
-    const tracks = data.tracks as ({ id: string; preview_url: string | null; duration_ms: number } | null)[];
-    for (const t of tracks) {
-      if (t?.id) {
-        results.push({ id: t.id, previewUrl: t.preview_url, durationMs: t.duration_ms });
+    try {
+      const data = await spotifyGet(`/tracks?ids=${chunk.join(',')}`, getToken);
+      const tracks = data.tracks as ({ id: string; duration_ms: number } | null)[];
+      for (const t of tracks) {
+        if (t?.id) durations.set(t.id, t.duration_ms);
       }
+    } catch {
+      // 실패해도 preview는 계속 시도
     }
   }
-  return results;
+
+  // 2) preview URL은 embed 파싱 — 동시 5개까지 병렬
+  const previews = new Map<string, string | null>();
+  const concurrency = 5;
+  for (let i = 0; i < trackIds.length; i += concurrency) {
+    const batch = trackIds.slice(i, i + concurrency);
+    const results = await Promise.all(batch.map(async id => {
+      const url = await fetchPreviewFromEmbed(id);
+      return { id, url };
+    }));
+    for (const r of results) previews.set(r.id, r.url);
+  }
+
+  return trackIds.map(id => ({
+    id,
+    previewUrl: previews.get(id) ?? null,
+    durationMs: durations.get(id) ?? 0,
+  }));
 }
