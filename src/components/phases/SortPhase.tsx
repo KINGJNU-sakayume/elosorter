@@ -13,10 +13,7 @@ interface Props {
   player: PlayerState & { play: (uri: string) => Promise<void>; toggle: () => void };
 }
 
-// 점수 차이가 이 값보다 작으면 '세밀 비교' 모드
 const FINE_MODE_THRESHOLD = 150;
-
-// 자동 저장: N번 비교마다 저장
 const AUTOSAVE_EVERY_N = 20;
 
 function fmtDuration(ms?: number): string {
@@ -27,7 +24,6 @@ function fmtDuration(ms?: number): string {
   return `${m}:${r < 10 ? '0' : ''}${r}`;
 }
 
-// 카드 컴포넌트 — AudioPlayer 포함
 interface CmpCardProps {
   track: Track;
   onClick: () => void;
@@ -47,7 +43,6 @@ function CmpCard({ track, onClick, locked, playMode, onPlayModeChange, fullPlaye
         display: 'flex', flexDirection: 'column', minHeight: 0,
       }}
     >
-      {/* 앨범 아트 — 클릭으로 선택 */}
       <div
         onClick={() => !locked && onClick()}
         style={{
@@ -61,7 +56,6 @@ function CmpCard({ track, onClick, locked, playMode, onPlayModeChange, fullPlaye
         {track.image && <img src={track.image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
       </div>
 
-      {/* 텍스트 + 플레이어 */}
       <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0 }}>
         <div style={{ minWidth: 0 }}>
           <div
@@ -108,8 +102,6 @@ export default function SortPhase({ player }: Props) {
   const isFineMode = A && B ? Math.abs(A.rating - B.rating) < FINE_MODE_THRESHOLD : false;
 
   const [playMode, setPlayMode] = useState<'preview' | 'full'>(loadPlayMode());
-
-  // 저장 상태
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [lastSavedCount, setLastSavedCount] = useState(compCount);
@@ -117,7 +109,20 @@ export default function SortPhase({ player }: Props) {
   const unsavedCount = compCount - lastSavedCount;
   const hasUnsaved = unsavedCount > 0;
 
-  // 현재 쌍에 대한 preview_url / duration_ms 보강 (기존 데이터가 필드 없으면 API로 가져옴)
+  // 🆕 선택시 재생을 멈추기 위한 헬퍼 — 전곡/미리듣기 모두 처리
+  const stopAllPlayback = useCallback(() => {
+    // 전곡 재생 중이면 멈춤 (SDK)
+    if (player.isPlaying) {
+      player.toggle();
+    }
+    // 프리뷰는 AudioPlayer 내부의 useEffect(track.id)가 처리 — 다음 쌍으로 넘어가면서 자동 정지
+    // 그러나 즉시 멈추기 위해 DOM에서 직접 모든 audio도 정지
+    document.querySelectorAll('audio').forEach(a => {
+      try { a.pause(); a.currentTime = 0; } catch { /* ignore */ }
+    });
+  }, [player]);
+
+  // 현재 쌍에 대한 preview_url / duration_ms 보강
   const enrichedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!A || !B) return;
@@ -128,7 +133,7 @@ export default function SortPhase({ player }: Props) {
     need.forEach(id => enrichedRef.current.add(id));
     fetchTrackDetails(need, getToken)
       .then(details => { if (details.length) dispatch({ type: 'ENRICH_TRACKS', payload: details }); })
-      .catch(() => { /* 실패해도 조용히 — 플레이어가 없는 정보는 전곡 모드로 폴백 */ });
+      .catch(() => { /* 실패해도 조용히 */ });
   }, [A?.id, B?.id, getToken, dispatch]);
 
   // 저장
@@ -155,14 +160,12 @@ export default function SortPhase({ player }: Props) {
     }
   }, [cfg, state, showToast]);
 
-  // 자동저장: N번 비교마다
   useEffect(() => {
     if (compCount === 0) return;
     if (unsavedCount >= AUTOSAVE_EVERY_N) { runCloudSave('auto'); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compCount]);
 
-  // 이탈 경고
   useEffect(() => {
     if (!hasUnsaved) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
@@ -170,8 +173,18 @@ export default function SortPhase({ player }: Props) {
     return () => window.removeEventListener('beforeunload', handler);
   }, [hasUnsaved]);
 
+  // SortPhase 자체 언마운트시에도 재생 정지
+  useEffect(() => {
+    return () => { stopAllPlayback(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleChoose = useCallback(async (scoreA: number) => {
     if (isChoosing || !curPair) return;
+
+    // 🆕 선택하는 순간 모든 재생 즉시 정지
+    stopAllPlayback();
+
     dispatch({ type: 'CHOOSE_START' });
     const [a, b] = curPair;
     const { newRatingA, newRatingB, avgDelta } = computeElo(a, b, scoreA);
@@ -193,12 +206,13 @@ export default function SortPhase({ player }: Props) {
       },
     });
     saveState({ tracks: newTracks, compCount: compCount + 1, rsiDeltas: [...rsiDeltas, avgDelta].slice(-100), currentSource });
-  }, [isChoosing, curPair, dispatch, seenPairs, tracks, compCount, rsiDeltas, currentSource, state.lastPairKey]);
+  }, [isChoosing, curPair, dispatch, seenPairs, tracks, compCount, rsiDeltas, currentSource, state.lastPairKey, stopAllPlayback]);
 
   const handleUndo = useCallback(() => {
     if (!sortHistory.length) return;
+    stopAllPlayback();  // 🆕 되돌릴 때도 정지
     dispatch({ type: 'UNDO_CHOOSE' });
-  }, [dispatch, sortHistory.length]);
+  }, [dispatch, sortHistory.length, stopAllPlayback]);
 
   useKeyboard({
     phase: 'sort',
@@ -209,7 +223,6 @@ export default function SortPhase({ player }: Props) {
     onUndo: handleUndo,
   });
 
-  // 정렬 안정도 계산
   const stability = rsi !== null ? Math.max(0, Math.min(100, Math.round((1 - rsi / 50) * 100))) : 0;
   const stabilityColor = rsi === null ? 'var(--text-tertiary)'
     : stability >= 80 ? 'var(--accent)'
@@ -217,7 +230,6 @@ export default function SortPhase({ player }: Props) {
     : 'var(--danger)';
   const isConverged = rsi !== null && rsi < 10;
 
-  // 5단계 / 3단계 버튼 정의
   const fineBtns = [
     { label: 'A 훨씬 좋다', key: '1', score: 1.0 },
     { label: 'A 약간',      key: '2', score: 0.7 },
@@ -232,7 +244,6 @@ export default function SortPhase({ player }: Props) {
   ];
   const activeBtns = isFineMode ? fineBtns : fastBtns;
 
-  // 저장 상태 표시
   function SaveIndicator() {
     if (!cfg.supabaseUrl) return <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontFamily: '"DM Mono", monospace' }}>☁ 로컬만 저장</span>;
     if (saveStatus === 'saving') return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.72rem', color: 'var(--accent)', fontFamily: '"DM Mono", monospace' }}><span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />저장 중…</span>;
@@ -269,7 +280,6 @@ export default function SortPhase({ player }: Props) {
       overflow: 'hidden',
     }}>
 
-      {/* 상단: 제목 + 모드 뱃지 + 저장 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -297,7 +307,6 @@ export default function SortPhase({ player }: Props) {
         )}
       </div>
 
-      {/* 정렬 안정도 바 */}
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, padding: '10px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10 }}
         title="최근 비교들의 평균 점수 변동. 100%에 가까울수록 순위가 확정됩니다"
@@ -319,7 +328,6 @@ export default function SortPhase({ player }: Props) {
         )}
       </div>
 
-      {/* 메인: 두 카드 */}
       <div style={{
         flex: 1, minHeight: 0,
         display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24,
@@ -342,7 +350,6 @@ export default function SortPhase({ player }: Props) {
         />
       </div>
 
-      {/* 비교 버튼 (균등 가로) */}
       <div style={{ flexShrink: 0, display: 'grid', gridTemplateColumns: `repeat(${activeBtns.length}, 1fr)`, gap: 8 }}>
         {activeBtns.map(b => (
           <button
@@ -375,7 +382,6 @@ export default function SortPhase({ player }: Props) {
         ))}
       </div>
 
-      {/* 하단: 되돌리기 + 랭킹 + 저장 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, gap: 8 }}>
         <button
           onClick={handleUndo}
