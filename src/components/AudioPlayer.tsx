@@ -28,6 +28,7 @@ interface FullPlayer {
   isPlaying: boolean;
   currentUri: string | null;
   play: (uri: string) => Promise<void>;
+  pause?: () => void;
   toggle: () => void;
   ready: boolean;
   sdkFailed: boolean;
@@ -38,7 +39,6 @@ interface Props {
   mode: PlayMode;
   onModeChange: (m: PlayMode) => void;
   fullPlayer: FullPlayer;
-  // 현재 이 플레이어가 전곡 모드에서 이 트랙을 재생 중인지 (부모가 판단해서 전달)
   fullIsCurrent: boolean;
 }
 
@@ -49,7 +49,7 @@ export default function AudioPlayer({ track, mode, onModeChange, fullPlayer, ful
   const hasPreview = !!track.previewUrl;
   const effectiveMode: PlayMode = (mode === 'preview' && !hasPreview) ? 'full' : mode;
 
-  // 트랙이 바뀌면 프리뷰 자동 정지
+  // 트랙이 바뀌면 프리뷰 정지 + 처음부터 재설정
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
@@ -59,37 +59,34 @@ export default function AudioPlayer({ track, mode, onModeChange, fullPlayer, ful
     setPreviewCurrent(0);
   }, [track.id]);
 
-  // 모드 변경시 저장
+  // 언마운트시에도 정지
+  useEffect(() => {
+    return () => {
+      const a = audioRef.current;
+      if (a) { a.pause(); a.currentTime = 0; }
+    };
+  }, []);
+
   function changeMode(m: PlayMode) {
-    if (m === 'preview' && !hasPreview) return;  // 프리뷰 없는 곡은 이 모드 금지
-    // 전환시 둘 다 정지
+    if (m === 'preview' && !hasPreview) return;
     const a = audioRef.current;
     if (a) { a.pause(); a.currentTime = 0; setPreviewPlaying(false); setPreviewCurrent(0); }
     onModeChange(m);
     savePlayMode(m);
   }
 
-  // 프리뷰 재생 토글
   function togglePreview() {
     const a = audioRef.current;
     if (!a || !track.previewUrl) return;
-    if (a.paused) {
-      a.play().catch(() => {});
-    } else {
-      a.pause();
-    }
+    if (a.paused) a.play().catch(() => {});
+    else a.pause();
   }
 
-  // 전곡 재생 토글
   function toggleFull() {
-    if (fullIsCurrent) {
-      fullPlayer.toggle();
-    } else {
-      fullPlayer.play(track.uri || `spotify:track:${track.id}`);
-    }
+    if (fullIsCurrent) fullPlayer.toggle();
+    else fullPlayer.play(track.uri || `spotify:track:${track.id}`);
   }
 
-  // 진행바 탐색 (프리뷰만 — SDK는 외부 제어 어려움)
   function seekPreview(e: React.MouseEvent<HTMLDivElement>) {
     const a = audioRef.current;
     if (!a || !a.duration) return;
@@ -101,27 +98,17 @@ export default function AudioPlayer({ track, mode, onModeChange, fullPlayer, ful
   const isPlaying = effectiveMode === 'preview' ? previewPlaying : (fullIsCurrent && fullPlayer.isPlaying);
   const toggle = effectiveMode === 'preview' ? togglePreview : toggleFull;
 
-  // 진행 표시 값
-  let progressPct = 0;
-  let timeLabel = '0:00';
-  let totalLabel = '';
-  if (effectiveMode === 'preview') {
-    const dur = audioRef.current?.duration || 30;
-    progressPct = (previewCurrent / dur) * 100;
-    timeLabel = fmtTime(previewCurrent * 1000);
-    totalLabel = fmtTime(dur * 1000);
-  } else {
-    // 전곡 모드: 진행도는 SDK에서 안 받으므로 간단히 재생 상태만 표시
-    progressPct = isPlaying ? 50 : 0;  // 애니메이션 대체로 불확정 표시
-    timeLabel = '';
-    totalLabel = fmtTime(track.durationMs ?? 0);
-  }
+  const dur = audioRef.current?.duration || 30;
+  const previewProgressPct = (previewCurrent / dur) * 100;
+  const previewTimeLabel = `${fmtTime(previewCurrent * 1000)} / ${fmtTime(dur * 1000)}`;
+  const trackTotalLabel = fmtTime(track.durationMs ?? 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {/* 숨겨진 audio 요소 (프리뷰 재생) */}
+      {/* 숨겨진 audio 요소 — key로 트랙마다 새 DOM 요소를 만들어 재생 누수 방지 */}
       {hasPreview && (
         <audio
+          key={track.id}
           ref={audioRef}
           src={track.previewUrl ?? undefined}
           preload="none"
@@ -132,7 +119,7 @@ export default function AudioPlayer({ track, mode, onModeChange, fullPlayer, ful
         />
       )}
 
-      {/* 재생 컨트롤 + 진행바 */}
+      {/* 재생 컨트롤 + 진행바/상태 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button
           onClick={toggle}
@@ -152,25 +139,35 @@ export default function AudioPlayer({ track, mode, onModeChange, fullPlayer, ful
           </svg>
         </button>
 
-        {/* 진행바 */}
-        <div
-          onClick={effectiveMode === 'preview' ? seekPreview : undefined}
-          style={{
-            flex: 1, height: 4, borderRadius: 2, background: 'var(--bg-sub)',
-            cursor: effectiveMode === 'preview' ? 'pointer' : 'default', overflow: 'hidden', position: 'relative',
-          }}
-        >
-          <div style={{
-            height: '100%', width: `${progressPct}%`,
-            background: 'var(--accent)',
-            transition: effectiveMode === 'preview' ? 'none' : 'width 0.2s',
-          }} />
-        </div>
-
-        {/* 시간 표시 */}
-        <div style={{ fontSize: '0.72rem', fontFamily: '"DM Mono", monospace', color: 'var(--text-tertiary)', minWidth: 72, textAlign: 'right', whiteSpace: 'nowrap' }}>
-          {effectiveMode === 'preview' ? `${timeLabel} / ${totalLabel}` : totalLabel}
-        </div>
+        {effectiveMode === 'preview' ? (
+          <>
+            <div
+              onClick={seekPreview}
+              style={{
+                flex: 1, height: 4, borderRadius: 2, background: 'var(--bg-sub)',
+                cursor: 'pointer', overflow: 'hidden',
+              }}
+            >
+              <div style={{ height: '100%', width: `${previewProgressPct}%`, background: 'var(--accent)' }} />
+            </div>
+            <div style={{ fontSize: '0.72rem', fontFamily: '"DM Mono", monospace', color: 'var(--text-tertiary)', minWidth: 82, textAlign: 'right', whiteSpace: 'nowrap' }}>
+              {previewTimeLabel}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ flex: 1, fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: '"DM Sans", sans-serif' }}>
+              {fullPlayer.sdkFailed
+                ? '전곡 재생 불가'
+                : !fullPlayer.ready
+                  ? 'Spotify 플레이어 준비 중…'
+                  : (isPlaying ? '재생 중' : '일시정지됨')}
+            </div>
+            <div style={{ fontSize: '0.72rem', fontFamily: '"DM Mono", monospace', color: 'var(--text-tertiary)', minWidth: 44, textAlign: 'right', whiteSpace: 'nowrap' }}>
+              {trackTotalLabel}
+            </div>
+          </>
+        )}
       </div>
 
       {/* 모드 토글 */}
