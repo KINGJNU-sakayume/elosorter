@@ -14,7 +14,7 @@ interface Props {
 }
 
 const FINE_MODE_THRESHOLD = 150;
-const AUTOSAVE_EVERY_N = 20;
+const AUTOSAVE_EVERY_N = 10;   // 🆕 티어 분류와 통일
 
 function fmtDuration(ms?: number): string {
   if (!ms || ms <= 0) return '';
@@ -28,13 +28,15 @@ interface CmpCardProps {
   track: Track;
   onClick: () => void;
   locked: boolean;
+  coverClickable: boolean;        // 🆕 빠른 비교 모드에서만 앨범 클릭 허용
   playMode: 'preview' | 'full';
   onPlayModeChange: (m: 'preview' | 'full') => void;
   fullPlayer: PlayerState & { play: (uri: string) => Promise<void>; toggle: () => void };
 }
 
-function CmpCard({ track, onClick, locked, playMode, onPlayModeChange, fullPlayer }: CmpCardProps) {
+function CmpCard({ track, onClick, locked, coverClickable, playMode, onPlayModeChange, fullPlayer }: CmpCardProps) {
   const fullIsCurrent = fullPlayer.currentUri === (track.uri || `spotify:track:${track.id}`);
+  const canClickCover = coverClickable && !locked;
   return (
     <div
       style={{
@@ -44,13 +46,13 @@ function CmpCard({ track, onClick, locked, playMode, onPlayModeChange, fullPlaye
       }}
     >
       <div
-        onClick={() => !locked && onClick()}
+        onClick={() => canClickCover && onClick()}
         style={{
           position: 'relative', width: '100%', aspectRatio: '1/1', overflow: 'hidden',
-          cursor: locked ? 'default' : 'pointer', flexShrink: 0,
+          cursor: canClickCover ? 'pointer' : 'default', flexShrink: 0,
           borderBottom: '1px solid var(--border)',
         }}
-        onMouseEnter={e => { if (!locked) { e.currentTarget.style.opacity = '0.92'; } }}
+        onMouseEnter={e => { if (canClickCover) e.currentTarget.style.opacity = '0.92'; }}
         onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
       >
         {track.image && <img src={track.image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
@@ -109,32 +111,35 @@ export default function SortPhase({ player }: Props) {
   const unsavedCount = compCount - lastSavedCount;
   const hasUnsaved = unsavedCount > 0;
 
-  // 🆕 선택시 재생을 멈추기 위한 헬퍼 — 전곡/미리듣기 모두 처리
   const stopAllPlayback = useCallback(() => {
-    // 전곡 재생 중이면 멈춤 (SDK)
     if (player.isPlaying) {
       player.toggle();
     }
-    // 프리뷰는 AudioPlayer 내부의 useEffect(track.id)가 처리 — 다음 쌍으로 넘어가면서 자동 정지
-    // 그러나 즉시 멈추기 위해 DOM에서 직접 모든 audio도 정지
     document.querySelectorAll('audio').forEach(a => {
       try { a.pause(); a.currentTime = 0; } catch { /* ignore */ }
     });
   }, [player]);
 
   // 현재 쌍에 대한 preview_url / duration_ms 보강
+  // previewUrl이 undefined이거나 durationMs가 없거나 0이면 보강
   const enrichedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!A || !B) return;
+    const needsEnrich = (t: Track) => {
+      if (enrichedRef.current.has(t.id)) return false;
+      const noPreview = t.previewUrl === undefined;
+      const noDuration = !t.durationMs;
+      return noPreview || noDuration;
+    };
     const need: string[] = [];
-    if (A.previewUrl === undefined && !enrichedRef.current.has(A.id)) need.push(A.id);
-    if (B.previewUrl === undefined && !enrichedRef.current.has(B.id)) need.push(B.id);
+    if (needsEnrich(A)) need.push(A.id);
+    if (needsEnrich(B)) need.push(B.id);
     if (!need.length) return;
     need.forEach(id => enrichedRef.current.add(id));
     fetchTrackDetails(need, getToken)
       .then(details => { if (details.length) dispatch({ type: 'ENRICH_TRACKS', payload: details }); })
-      .catch(() => { /* 실패해도 조용히 */ });
-  }, [A?.id, B?.id, getToken, dispatch]);
+      .catch(e => { console.warn('[SortPhase] 트랙 보강 실패:', e); });
+  }, [A?.id, B?.id, A?.durationMs, B?.durationMs, getToken, dispatch]);
 
   // 저장
   const savingRef = useRef(false);
@@ -160,6 +165,7 @@ export default function SortPhase({ player }: Props) {
     }
   }, [cfg, state, showToast]);
 
+  // 🆕 자동저장: 10회 비교마다
   useEffect(() => {
     if (compCount === 0) return;
     if (unsavedCount >= AUTOSAVE_EVERY_N) { runCloudSave('auto'); }
@@ -173,7 +179,6 @@ export default function SortPhase({ player }: Props) {
     return () => window.removeEventListener('beforeunload', handler);
   }, [hasUnsaved]);
 
-  // SortPhase 자체 언마운트시에도 재생 정지
   useEffect(() => {
     return () => { stopAllPlayback(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,10 +186,7 @@ export default function SortPhase({ player }: Props) {
 
   const handleChoose = useCallback(async (scoreA: number) => {
     if (isChoosing || !curPair) return;
-
-    // 🆕 선택하는 순간 모든 재생 즉시 정지
     stopAllPlayback();
-
     dispatch({ type: 'CHOOSE_START' });
     const [a, b] = curPair;
     const { newRatingA, newRatingB, avgDelta } = computeElo(a, b, scoreA);
@@ -210,7 +212,7 @@ export default function SortPhase({ player }: Props) {
 
   const handleUndo = useCallback(() => {
     if (!sortHistory.length) return;
-    stopAllPlayback();  // 🆕 되돌릴 때도 정지
+    stopAllPlayback();
     dispatch({ type: 'UNDO_CHOOSE' });
   }, [dispatch, sortHistory.length, stopAllPlayback]);
 
@@ -268,8 +270,8 @@ export default function SortPhase({ player }: Props) {
   }
 
   const modeHint = isFineMode
-    ? '두 곡의 점수가 비슷해 세밀한 비교를 요청합니다'
-    : '점수 차이가 커서 빠른 판단만 요청합니다';
+    ? '두 곡의 점수가 비슷해 세밀한 비교를 요청합니다 — 아래 버튼으로 선택하세요'
+    : '점수 차이가 커서 빠른 판단만 요청합니다 — 앨범을 클릭하거나 아래 버튼으로 선택하세요';
 
   return (
     <div style={{
@@ -336,6 +338,7 @@ export default function SortPhase({ player }: Props) {
           track={A}
           onClick={() => handleChoose(1.0)}
           locked={isChoosing}
+          coverClickable={!isFineMode}
           playMode={playMode}
           onPlayModeChange={setPlayMode}
           fullPlayer={player}
@@ -344,6 +347,7 @@ export default function SortPhase({ player }: Props) {
           track={B}
           onClick={() => handleChoose(0.0)}
           locked={isChoosing}
+          coverClickable={!isFineMode}
           playMode={playMode}
           onPlayModeChange={setPlayMode}
           fullPlayer={player}
