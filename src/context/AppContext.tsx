@@ -16,7 +16,8 @@ const initial: AppState = {
   isChoosing: false,
   user: null,
   pendingNewTracks: [],
-  pendingRemovedIds: [],   // 🆕
+  pendingRemovedIds: [],
+  sortHistory: [],
 };
 
 function reducer(state: AppState, action: AppAction): AppState {
@@ -56,13 +57,15 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, isChoosing: true };
 
     case 'CHOOSE_DONE': {
-      const { updatedA, updatedB, rsiDelta, newPairKey, nextPair, newSeenPairs } = action.payload;
+      const { updatedA, updatedB, rsiDelta, newPairKey, nextPair, newSeenPairs, prevA, prevB, prevCurPair, prevLastPairKey } = action.payload;
       const tracks = state.tracks.map(t => {
         if (t.id === updatedA.id) return { ...updatedA, isNew: updatedA.comparisons >= 8 ? false : t.isNew };
         if (t.id === updatedB.id) return { ...updatedB, isNew: updatedB.comparisons >= 8 ? false : t.isNew };
         return t;
       });
       const newDeltas = [...state.rsiDeltas, rsiDelta].slice(-100);
+      // 🆕 되돌리기용 히스토리에 push (최근 20개만 유지)
+      const newHistory = [...state.sortHistory, { trackA: prevA, trackB: prevB, rsiDelta, pairKey: newPairKey, prevCurPair, prevLastPairKey }].slice(-20);
       return {
         ...state,
         tracks,
@@ -72,6 +75,34 @@ function reducer(state: AppState, action: AppAction): AppState {
         lastPairKey: newPairKey,
         curPair: nextPair,
         isChoosing: false,
+        sortHistory: newHistory,
+      };
+    }
+
+    case 'UNDO_CHOOSE': {
+      if (!state.sortHistory.length) return state;
+      const history = [...state.sortHistory];
+      const last = history.pop()!;
+      // 트랙 상태를 비교 전으로 되돌림
+      const tracks = state.tracks.map(t => {
+        if (t.id === last.trackA.id) return last.trackA;
+        if (t.id === last.trackB.id) return last.trackB;
+        return t;
+      });
+      // seenPairs에서 해당 쌍 제거
+      const newSeen = new Set(state.seenPairs);
+      newSeen.delete(last.pairKey);
+      // rsiDeltas 마지막 항목 제거
+      const newDeltas = state.rsiDeltas.slice(0, -1);
+      return {
+        ...state,
+        tracks,
+        compCount: Math.max(0, state.compCount - 1),
+        rsiDeltas: newDeltas,
+        seenPairs: newSeen,
+        lastPairKey: last.prevLastPairKey,
+        curPair: last.prevCurPair,
+        sortHistory: history,
       };
     }
 
@@ -85,24 +116,31 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, tracks: merged, pendingNewTracks: [], curPair };
     }
 
-    // 🆕 Spotify에서 제거된 ID를 "삭제 대기" 상태로 기록
     case 'SET_PENDING_REMOVED':
       return { ...state, pendingRemovedIds: action.payload };
 
-    // 🆕 실제로 삭제 적용
     case 'APPLY_REMOVAL': {
       if (!state.pendingRemovedIds.length) return state;
       const removedSet = new Set(state.pendingRemovedIds);
       const tracks = state.tracks.filter(t => !removedSet.has(t.id));
-      // tierHistory도 정리 (삭제된 곡은 undo 대상에서 제외)
       const tierHistory = state.tierHistory.filter(id => !removedSet.has(id));
       const curPair = getNextPair(tracks, state.seenPairs, state.lastPairKey);
       return { ...state, tracks, tierHistory, pendingRemovedIds: [], curPair };
     }
 
-    // 🆕 삭제 대기 해제 (로컬에 계속 유지)
     case 'DISMISS_REMOVAL':
       return { ...state, pendingRemovedIds: [] };
+
+    case 'ENRICH_TRACKS': {
+      // 곡들에 previewUrl, durationMs 추가 (기존 값 유지)
+      const enrichMap = new Map(action.payload.map(e => [e.id, e]));
+      const tracks = state.tracks.map(t => {
+        const e = enrichMap.get(t.id);
+        if (!e) return t;
+        return { ...t, previewUrl: e.previewUrl, durationMs: e.durationMs };
+      });
+      return { ...state, tracks };
+    }
 
     case 'LOAD_STATE': {
       const { seenPairs, tracks, ...rest } = action.payload;
