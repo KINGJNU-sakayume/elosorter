@@ -40,7 +40,7 @@ export default function RankPhase() {
       {sorted.map((track: Track) => {
         const rank = rankMap[track.id];
         return (
-          
+          <a
             key={track.id}
             href={`https://open.spotify.com/track/${track.id}`}
             target="_blank" rel="noopener noreferrer"
