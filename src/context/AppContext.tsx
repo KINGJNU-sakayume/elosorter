@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react';
 import type { AppState, AppAction, Track } from '../utils/types';
-import { getNextPair, initRating } from '../utils/elo';
-
+import { getNextPair, initRating, NEW_TRACK_THRESHOLD } from '../utils/elo';
 const initial: AppState = {
   phase: 'import',
   tracks: [],
@@ -65,8 +64,8 @@ function reducer(state: AppState, action: AppAction): AppState {
     case 'CHOOSE_DONE': {
       const { updatedA, updatedB, rsiDelta, newPairKey, nextPair, newSeenPairs, prevA, prevB, prevCurPair, prevLastPairKey } = action.payload;
       const tracks = state.tracks.map(t => {
-        if (t.id === updatedA.id) return { ...updatedA, isNew: updatedA.comparisons >= 8 ? false : t.isNew };
-        if (t.id === updatedB.id) return { ...updatedB, isNew: updatedB.comparisons >= 8 ? false : t.isNew };
+        if (t.id === updatedA.id) return { ...updatedA, isNew: updatedA.comparisons >= NEW_TRACK_THRESHOLD ? false : t.isNew };
+        if (t.id === updatedB.id) return { ...updatedB, isNew: updatedB.comparisons >= NEW_TRACK_THRESHOLD ? false : t.isNew };
         return t;
       });
       const newDeltas = [...state.rsiDeltas, rsiDelta].slice(-100);
