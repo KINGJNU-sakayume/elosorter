@@ -39,14 +39,12 @@ export function getNextPair(
   if (pool.length < 2) return null;
 
   const newPool = pool.filter(t => t.isNew && t.comparisons < 8);
-  let A: Track;
-  if (newPool.length > 0) {
-    A = [...newPool].sort((a, b) => a.comparisons - b.comparisons)[0];
-  } else {
-    const shuffled = [...pool].sort(() => Math.random() - 0.5);
-    shuffled.sort((a, b) => a.comparisons - b.comparisons);
-    A = shuffled[0];
-  }
+  // 둘 다 같은 원칙: "비교 횟수가 최소인 곡들 중 균등 랜덤 선택"
+  // sort 기반 셔플은 V8 등에서 편향되므로 명시적 min-group 샘플링 사용
+  const sourcePool = newPool.length > 0 ? newPool : pool;
+  const minComp = Math.min(...sourcePool.map(t => t.comparisons));
+  const leastCompared = sourcePool.filter(t => t.comparisons === minComp);
+  const A: Track = leastCompared[Math.floor(Math.random() * leastCompared.length)];
 
   let candidates = pool.filter(t => t.id !== A.id && t.tier === A.tier);
   if (!candidates.length) candidates = pool.filter(t => t.id !== A.id);
