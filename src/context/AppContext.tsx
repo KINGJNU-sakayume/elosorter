@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react';
-import type { AppState, AppAction } from '../utils/types';
+import type { AppState, AppAction, Track } from '../utils/types';
 import { getNextPair, initRating } from '../utils/elo';
 
 const initial: AppState = {
@@ -36,9 +36,13 @@ function reducer(state: AppState, action: AppAction): AppState {
 
     case 'ASSIGN_TIER': {
       const { id, tier } = action.payload;
-      const tracks = state.tracks.map(t =>
-        t.id === id ? { ...t, tier, rating: initRating(tier) } : t
-      );
+      // 현재 UI는 미분류 곡만 분류 가능하지만, reducer는 방어적으로 처리:
+      // 이미 티어가 있는 곡이 들어오면 rating·comparisons 보존 (재분류 시 데이터 손실 방지).
+      const tracks = state.tracks.map(t => {
+        if (t.id !== id) return t;
+        if (t.tier !== null) return { ...t, tier };
+        return { ...t, tier, rating: initRating(tier) };
+      });
       return { ...state, tracks, tierHistory: [...state.tierHistory, id] };
     }
 
@@ -46,8 +50,10 @@ function reducer(state: AppState, action: AppAction): AppState {
       if (!state.tierHistory.length) return state;
       const history = [...state.tierHistory];
       const id = history.pop()!;
-      const tracks = state.tracks.map(t =>
-        t.id === id ? { ...t, tier: null as 1 | 2 | 3 | null, rating: 1500 } : t
+      // 현재 UI에선 방금 assign된 곡(rating=1500, comparisons=0이었던 신규 곡)의 undo 전용.
+      // 재분류 undo는 현재 unreachable. 향후 추가 시 tierHistory에 스냅샷 저장 필요.
+      const tracks: Track[] = state.tracks.map(t =>
+        t.id === id ? { ...t, tier: null, rating: 1500 } : t
       );
       return { ...state, tracks, tierHistory: history };
     }
