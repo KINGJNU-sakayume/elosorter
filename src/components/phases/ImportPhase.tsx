@@ -114,7 +114,7 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
       const tracks = await fetchAllTracks('/me/tracks?limit=50', getToken, (n, total) => setLoadingText(`좋아요 곡 불러오는 중… ${n} / ${total}`));
       dispatch({ type: 'SET_TRACKS', payload: tracks });
       dispatch({ type: 'LOAD_STATE', payload: { currentSource: 'liked' } });
-      saveState({ tracks, compCount: 0, rsiDeltas: [], currentSource: 'liked' });
+      saveState({ tracks, compCount: 0, rsiDeltas: [], currentSource: 'liked', seenPairs: [], lastPairKey: '' });
       showToast(`✅ ${tracks.length}곡 불러오기 완료`);
       dispatch({ type: 'SET_PHASE', payload: tracks.some(t => t.tier === null) ? 'tier' : 'sort' });
     } catch (e) { showToast('❌ 불러오기 실패: ' + String(e)); }
@@ -129,7 +129,7 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
       const src = `playlist:${selectedPl.id}`;
       dispatch({ type: 'SET_TRACKS', payload: tracks });
       dispatch({ type: 'LOAD_STATE', payload: { currentSource: src } });
-      saveState({ tracks, compCount: 0, rsiDeltas: [], currentSource: src });
+      saveState({ tracks, compCount: 0, rsiDeltas: [], currentSource: src, seenPairs: [], lastPairKey: '' });
       showToast(`✅ ${tracks.length}곡 불러오기 완료`);
       dispatch({ type: 'SET_PHASE', payload: tracks.some(t => t.tier === null) ? 'tier' : 'sort' });
     } catch (e) { showToast('❌ 불러오기 실패: ' + String(e)); }
