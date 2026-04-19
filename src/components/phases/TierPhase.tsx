@@ -278,7 +278,7 @@ export default function TierPhase({ player }: Props) {
                 ↩ 되돌리기 (Z)
               </button>
               {done > 0 && (
-                <button onClick={() => { tracks.filter(t => t.tier === null).forEach(t => dispatch({ type: 'ASSIGN_TIER', payload: { id: t.id, tier: 3 } })); }}
+                <button onClick={() => dispatch({ type: 'BULK_ASSIGN_REMAINING', payload: { tier: 3 } })}
                   style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid transparent', background: 'transparent', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.8rem' }}>
                   나머지 Tier 3으로 →
                 </button>
