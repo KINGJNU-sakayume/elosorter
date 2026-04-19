@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useKeyboard } from '../../hooks/useKeyboard';
 import { computeElo, pairKey, getNextPair, computeRSI } from '../../utils/elo';
-import { loadConfig, saveState } from '../../utils/config';
+import { loadConfig, saveState, serializeState } from '../../utils/config';
 import { saveToSupabase } from '../../utils/supabase';
 import { fetchTrackDurations } from '../../utils/spotify';
 import { useSpotifyAuth } from '../../hooks/useSpotifyAuth';
@@ -140,7 +140,7 @@ export default function SortPhase({ player }: Props) {
     if (!userId) return;  // 로그인 전이면 클라우드 저장 skip (로컬 저장은 유지됨)
     savingRef.current = true;
     setSaveStatus('saving');
-    const data = { tracks: state.tracks, compCount: state.compCount, rsiDeltas: state.rsiDeltas, currentSource: state.currentSource };
+    const data = serializeState(state);
     const curCompCount = state.compCount;
     try {
       const r = await saveToSupabase(data, cfg, userId);
@@ -199,7 +199,14 @@ export default function SortPhase({ player }: Props) {
         prevLastPairKey: state.lastPairKey,
       },
     });
-    saveState({ tracks: newTracks, compCount: compCount + 1, rsiDeltas: [...rsiDeltas, avgDelta].slice(-100), currentSource });
+    saveState({
+      tracks: newTracks,
+      compCount: compCount + 1,
+      rsiDeltas: [...rsiDeltas, avgDelta].slice(-100),
+      currentSource,
+      seenPairs: Array.from(newSeen),
+      lastPairKey: key,
+    });
   }, [isChoosing, curPair, dispatch, seenPairs, tracks, compCount, rsiDeltas, currentSource, state.lastPairKey, stopAllPlayback]);
 
   const handleUndo = useCallback(() => {
