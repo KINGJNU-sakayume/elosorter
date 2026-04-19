@@ -51,6 +51,7 @@ export type AppAction =
   | { type: 'SET_USER'; payload: SpotifyUser | null }
   | { type: 'ASSIGN_TIER'; payload: { id: string; tier: 1 | 2 | 3 } }
   | { type: 'UNDO_TIER' }
+  | { type: 'BULK_ASSIGN_REMAINING'; payload: { tier: 1 | 2 | 3 } }
   | { type: 'CHOOSE_START' }
   | { type: 'CHOOSE_DONE'; payload: ChooseDonePayload }
   | { type: 'UNDO_CHOOSE' }                                        // 🆕 비교 되돌리기

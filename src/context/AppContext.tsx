@@ -57,6 +57,17 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, tracks, tierHistory: history };
     }
 
+    case 'BULK_ASSIGN_REMAINING': {
+      const { tier } = action.payload;
+      const rating = initRating(tier);
+      // 미분류 곡만 일괄 업데이트. 한 번의 map으로 처리.
+      // undo 스택(tierHistory)에는 쌓지 않음 — 되돌릴 일이 드문 정리 동작.
+      const tracks = state.tracks.map(t =>
+        t.tier === null ? { ...t, tier, rating } : t
+      );
+      return { ...state, tracks };
+    }
+
     case 'CHOOSE_START':
       if (state.isChoosing || !state.curPair) return state;
       return { ...state, isChoosing: true };
