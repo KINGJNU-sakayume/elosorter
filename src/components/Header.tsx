@@ -24,7 +24,16 @@ export default function Header() {
     <div
       style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--header-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', gap: 12 }}
     >
-      <div className="font-mono text-accent text-[0.95rem] tracking-[0.05em] flex items-center gap-2 shrink-0">
+      <div style={{
+        fontFamily: '"DM Mono", monospace',
+        color: 'var(--accent)',
+        fontSize: '0.95rem',
+        letterSpacing: '0.05em',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        flexShrink: 0,
+      }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }} />
         ELO SORTER
       </div>
