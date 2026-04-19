@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useSpotifyAuth } from '../../hooks/useSpotifyAuth';
-import { fetchAllTracks, fetchPlaylists } from '../../utils/spotify';
+import { fetchAllTracks, fetchPlaylists, fetchTrackDurations } from '../../utils/spotify';
 import { loadConfig, loadState, saveState } from '../../utils/config';
 import { checkCloudSession, loadFromSupabase, deleteCloudSession } from '../../utils/supabase';
 import type { SpotifyPlaylist, SpotifyUser } from '../../utils/types';
@@ -76,6 +76,34 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
   useEffect(() => {
     if (onSyncTrigger) onSyncTrigger(handleSync);
   }, [state.tracks.length]);
+
+  // durationMs 일괄 보강: 1-c 이전 레거시 곡(durationMs=0)을 배치로 메꾼다.
+  // SortPhase의 쌍 단위 보강은 안전망으로 유지되지만, ImportPhase 진입 시
+  // 한 번에 다 처리하는 편이 UX상 낫다.
+  const duraBackfillAttemptedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!isLoggedIn()) return;
+    const needIds = state.tracks
+      .filter(t => !t.durationMs)
+      .map(t => t.id)
+      .filter(id => !duraBackfillAttemptedRef.current.has(id));
+    if (!needIds.length) return;
+
+    // 이번 시도 대상을 미리 기록해 재진입 방지 (부분 실패해도 재시도 안 함)
+    needIds.forEach(id => duraBackfillAttemptedRef.current.add(id));
+
+    (async () => {
+      try {
+        const details = await fetchTrackDurations(needIds, getToken);
+        if (details.length) {
+          dispatch({ type: 'ENRICH_TRACKS', payload: details });
+        }
+      } catch (e) {
+        console.warn('[ImportPhase] durationMs 일괄 보강 실패:', e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.tracks.length, isLoggedIn()]);
 
   async function handleSync() {
   if (!state.tracks.length) { showToast('⚠️ 먼저 음악 소스를 불러오세요'); return; }
@@ -182,12 +210,12 @@ export default function ImportPhase({ onSyncTrigger }: Props) {
           좋아요 곡 또는 플레이리스트를 불러와 ELO 정렬을 시작하세요.
         </p>
         <button
-           onClick={async () => {
-             const ok = await login();
-             if (!ok) showToast('⚠️ 설정에서 Spotify Client ID를 먼저 입력하세요');
-           }}
-           style={{ ...S.btn('green'), background: 'var(--spotify-green)', borderColor: 'var(--spotify-green)' }}
-         >
+          onClick={async () => {
+            const ok = await login();
+            if (!ok) showToast('⚠️ 설정에서 Spotify Client ID를 먼저 입력하세요');
+          }}
+          style={{ ...S.btn('green'), background: 'var(--spotify-green)', borderColor: 'var(--spotify-green)' }}
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 01-.277-1.215c3.809-.87 7.076-.495 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.78.78 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 01-.973-.519.781.781 0 01.52-.973c3.632-1.102 8.147-.568 11.233 1.329a.78.78 0 01.257 1.072zm.105-2.835C14.69 9.145 9.375 8.955 6.204 9.88a.937.937 0 11-.543-1.794c3.618-1.096 9.635-.884 13.432 1.312a.937.937 0 01-.179 1.469z"/></svg>
           Spotify로 로그인
         </button>
