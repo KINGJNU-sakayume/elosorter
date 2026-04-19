@@ -60,7 +60,6 @@ export function useSpotifyAuth() {
     const cfg = loadConfig();
     if (!cfg.clientId) {
       console.warn('[Spotify] Client ID가 설정되지 않았습니다.');
-      alert('Spotify Client ID가 설정되지 않았습니다.');
       return false;
     }
     const { verifier, challenge } = await generatePKCE();
