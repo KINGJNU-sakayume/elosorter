@@ -1,4 +1,4 @@
-import type { Config } from './types';
+import type { Config, AppState } from './types';
 
 const CFG_KEY = 'eloConfig';
 
@@ -49,4 +49,19 @@ export function loadState() {
   } catch {
     return null;
   }
+}
+
+/**
+ * AppState를 localStorage/Supabase에 저장 가능한 plain object로 변환.
+ * Set은 JSON.stringify로 직렬화할 수 없으므로 배열로 변환.
+ */
+export function serializeState(state: AppState) {
+  return {
+    tracks: state.tracks,
+    compCount: state.compCount,
+    rsiDeltas: state.rsiDeltas,
+    currentSource: state.currentSource,
+    seenPairs: Array.from(state.seenPairs),
+    lastPairKey: state.lastPairKey,
+  };
 }

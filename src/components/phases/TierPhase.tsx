@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useKeyboard } from '../../hooks/useKeyboard';
-import { loadConfig, saveState } from '../../utils/config';
+import { loadConfig, saveState, serializeState } from '../../utils/config';
 import { saveToSupabase } from '../../utils/supabase';
 import type { PlayerState } from '../../utils/types';
 
@@ -46,7 +46,7 @@ export default function TierPhase({ player }: Props) {
     if (!userId) return; // 로그인 전이면 skip
     savingRef.current = true;
     setSaveStatus('saving');
-    const data = { tracks: state.tracks, compCount: state.compCount, rsiDeltas: state.rsiDeltas, currentSource: state.currentSource };
+    const data = serializeState(state);
     const currentDone = state.tracks.filter(t => t.tier !== null).length;
     try {
       const r = await saveToSupabase(data, cfg, userId);
@@ -75,7 +75,7 @@ export default function TierPhase({ player }: Props) {
   // 분류 완료시 한번 저장
   useEffect(() => {
     if (!allDone || !tracks.length) return;
-    saveState({ tracks: state.tracks, compCount: state.compCount, rsiDeltas: state.rsiDeltas, currentSource: state.currentSource });
+    saveState(serializeState(state));
     runCloudSave('done');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allDone]);
@@ -103,7 +103,7 @@ export default function TierPhase({ player }: Props) {
   const assignTier = useCallback((tier: 1 | 2 | 3) => {
     if (!currentTrack) return;
     dispatch({ type: 'ASSIGN_TIER', payload: { id: currentTrack.id, tier } });
-    saveState({ tracks: state.tracks, compCount: state.compCount, rsiDeltas: state.rsiDeltas, currentSource: state.currentSource });
+    saveState(serializeState(state));
   }, [currentTrack, dispatch, state]);
 
   const undoTier = useCallback(() => {
