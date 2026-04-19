@@ -49,7 +49,7 @@ export default function RankPhase() {
           <div key={track.id}>
             {isNewTier && track.tier && (
               <div style={{ padding: '8px 14px', borderRadius: 8, background: tierBgColors[track.tier], color: tierColors[track.tier], fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, marginTop: 16 }}>
-                {tierLabels[track.tier]}  ({sorted.filter(t => t.tier === track.tier).length}곡)
+                {tierLabels[track.tier]}  ({track.tier === 1 ? c1 : track.tier === 2 ? c2 : c3}곡)
               </div>
             )}
             <a
