@@ -39,10 +39,10 @@ export default function RankPhase() {
 
       {sorted.map((track: Track) => {
         const rank = rankMap[track.id];
-       return (
-  
-    key={track.id}
-    href={`https://open.spotify.com/track/${track.id}`}
+        return (
+          
+            key={track.id}
+            href={`https://open.spotify.com/track/${track.id}`}
             target="_blank" rel="noopener noreferrer"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6, transition: 'all 0.15s', textDecoration: 'none', color: 'inherit' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.background = 'var(--bg-sub)'; }}
