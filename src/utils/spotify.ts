@@ -2,22 +2,36 @@ import type { Track, SpotifyPlaylist } from './types';
 
 export function trackFromItem(item: Record<string, unknown>): Track | null {
   const t = (item.track as Record<string, unknown>) || item;
-  if (!t?.id) return null;
-  const artists = t.artists as { name: string }[];
-  const album = t.album as { name: string; images: { url: string }[] };
+  // 필수 필드 가드: id 없거나 로컬 파일/제거된 트랙일 경우 스킵
+  if (!t || typeof t.id !== 'string' || !t.id) return null;
+
+  const rawArtists = t.artists;
+  const artists = Array.isArray(rawArtists)
+    ? rawArtists
+        .map((a) => (a && typeof a === 'object' && typeof (a as { name?: unknown }).name === 'string'
+          ? (a as { name: string }).name
+          : ''))
+        .filter(Boolean)
+    : [];
+
+  const rawAlbum = (t.album && typeof t.album === 'object') ? t.album as Record<string, unknown> : null;
+  const albumName = typeof rawAlbum?.name === 'string' ? rawAlbum.name : '';
+  const albumImages = Array.isArray(rawAlbum?.images) ? rawAlbum.images as { url?: unknown }[] : [];
+  const image = typeof albumImages[0]?.url === 'string' ? albumImages[0].url : '';
+
   return {
-    id: t.id as string,
-    name: t.name as string,
-    artists: artists.map((a) => a.name),
-    image: album.images?.[0]?.url || '',
-    album: album.name || '',
-    uri: t.uri as string,
-    addedAt: (item.added_at as string) || null,
+    id: t.id,
+    name: typeof t.name === 'string' ? t.name : '(제목 없음)',
+    artists,
+    image,
+    album: albumName,
+    uri: typeof t.uri === 'string' ? t.uri : `spotify:track:${t.id}`,
+    addedAt: typeof item.added_at === 'string' ? item.added_at : null,
     tier: null,
     rating: 1500,
     comparisons: 0,
     isNew: false,
-    durationMs: (t.duration_ms as number) ?? 0,
+    durationMs: typeof t.duration_ms === 'number' ? t.duration_ms : 0,
   };
 }
 
@@ -113,9 +127,14 @@ export async function fetchTrackDurations(
     const chunk = trackIds.slice(i, i + 50);
     try {
       const data = await spotifyGet(`/tracks?ids=${chunk.join(',')}`, getToken);
-      const tracks = data.tracks as ({ id: string; duration_ms: number } | null)[];
-      for (const t of tracks) {
-        if (t?.id) result.push({ id: t.id, durationMs: t.duration_ms ?? 0 });
+      const rawTracks = data.tracks;
+      if (!Array.isArray(rawTracks)) continue;
+      for (const raw of rawTracks) {
+        if (!raw || typeof raw !== 'object') continue;
+        const t = raw as { id?: unknown; duration_ms?: unknown };
+        if (typeof t.id === 'string' && typeof t.duration_ms === 'number') {
+          result.push({ id: t.id, durationMs: t.duration_ms });
+        }
       }
     } catch (e) {
       console.warn('[spotify] /v1/tracks 호출 실패:', e);
