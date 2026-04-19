@@ -27,6 +27,10 @@ export function useSpotifyPlayer(getToken: () => Promise<string | null>) {
   const playerRef = useRef<SpotifyPlayerInstance | null>(null);
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+  // getToken 참조가 외부에서 재생성되어도 stale closure를 피하기 위해 ref로 래핑
+  const getTokenRef = useRef(getToken);
+  useEffect(() => { getTokenRef.current = getToken; }, [getToken]);
+
   const [ps, setPs] = useState<PlayerState>({
     ready: false,
     deviceId: null,
@@ -40,13 +44,13 @@ export function useSpotifyPlayer(getToken: () => Promise<string | null>) {
     if (isMobile) return;
 
     const init = async () => {
-      const token = await getToken();
+      const token = await getTokenRef.current();
       if (!token) { setPs(s => ({ ...s, sdkFailed: true })); return; }
       if (!window.Spotify) { setPs(s => ({ ...s, sdkFailed: true })); return; }
 
       const player = new window.Spotify.Player({
         name: 'ELO Sorter',
-        getOAuthToken: async (cb) => { const t = await getToken(); if (t) cb(t); },
+        getOAuthToken: async (cb) => { const t = await getTokenRef.current(); if (t) cb(t); },
         volume: 0.8,
       });
 
@@ -83,14 +87,14 @@ export function useSpotifyPlayer(getToken: () => Promise<string | null>) {
 
   const play = useCallback(async (uri: string) => {
     if (!ps.deviceId) return;
-    const token = await getToken();
+    const token = await getTokenRef.current();
     if (!token) return;
     await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${ps.deviceId}`, {
       method: 'PUT',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ uris: [uri] }),
     });
-  }, [ps.deviceId, getToken]);
+  }, [ps.deviceId]);
 
   const pause = useCallback(() => playerRef.current?.pause(), []);
   const resume = useCallback(() => playerRef.current?.resume(), []);
