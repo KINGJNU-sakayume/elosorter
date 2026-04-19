@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { loadConfig } from '../utils/config';
 
 const SCOPES = [
@@ -35,6 +35,17 @@ export function useSpotifyAuth() {
   const [authed, setAuthed] = useState<boolean>(
     () => !!localStorage.getItem('spotify_access_token')
   );
+
+  // 다른 탭에서 로그인/로그아웃이 일어나면 이 탭도 동기화
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === 'spotify_access_token') {
+        setAuthed(!!e.newValue);
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
 
   const isLoggedIn = useCallback((): boolean => authed, [authed]);
 
