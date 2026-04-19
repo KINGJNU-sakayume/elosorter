@@ -61,6 +61,15 @@ export function useSpotifyPlayer(getToken: () => Promise<string | null>) {
       player.addListener('not_ready', () => setPs(s => ({ ...s, ready: false, deviceId: null })));
       player.addListener('initialization_error', () => setPs(s => ({ ...s, sdkFailed: true })));
       player.addListener('authentication_error', () => setPs(s => ({ ...s, sdkFailed: true })));
+      player.addListener('account_error', (data) => {
+        console.error('[SpotifyPlayer] account_error (Premium 필요?):', data);
+        setPs(s => ({ ...s, sdkFailed: true }));
+      });
+      player.addListener('playback_error', (data) => {
+        console.error('[SpotifyPlayer] playback_error:', data);
+        // DRM 실패, 라이선스 만료 등이 여기로 들어옴
+      });
+
       player.addListener('player_state_changed', (state) => {
         if (!state) return;
         const st = state as { paused: boolean; track_window: { current_track: { uri: string } } };
@@ -86,15 +95,18 @@ export function useSpotifyPlayer(getToken: () => Promise<string | null>) {
   }, []);
 
   const play = useCallback(async (uri: string) => {
-    if (!ps.deviceId) return;
-    const token = await getTokenRef.current();
-    if (!token) return;
-    await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${ps.deviceId}`, {
-      method: 'PUT',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uris: [uri] }),
-    });
-  }, [ps.deviceId]);
+  if (!ps.deviceId) { console.warn('[play] deviceId 없음 — SDK 아직 준비 안 됨'); return; }
+  const token = await getTokenRef.current();
+  if (!token) return;
+  const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${ps.deviceId}`, {
+    method: 'PUT',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uris: [uri] }),
+  });
+  if (!res.ok) {
+    console.error('[play] 실패', res.status, await res.text());
+  }
+}, [ps.deviceId]);
 
   const pause = useCallback(() => playerRef.current?.pause(), []);
   const resume = useCallback(() => playerRef.current?.resume(), []);
