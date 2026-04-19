@@ -10,7 +10,12 @@ const DEFAULTS = {
   anonKey:     import.meta.env.VITE_SUPABASE_ANON_KEY   ?? '',
 };
 
+// 매 렌더마다 localStorage.getItem + JSON.parse가 반복되지 않도록 캐시.
+// saveConfig에서 null로 되돌려 다음 호출 시 재계산하게 한다.
+let cached: Config | null = null;
+
 export function loadConfig(): Config {
+  if (cached) return cached;
   const base: Config = {
     clientId: DEFAULTS.clientId,
     supabaseUrl: DEFAULTS.supabaseUrl,
@@ -28,11 +33,13 @@ export function loadConfig(): Config {
     } catch { /* ignore */ }
   }
   base.redirectUri = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
-  return base;
+  cached = base;
+  return cached;
 }
 
 export function saveConfig(cfg: Omit<Config, 'redirectUri'>): Config {
   localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+  cached = null; // 캐시 무효화: 다음 loadConfig에서 갱신된 값 반환
   return loadConfig();
 }
 
