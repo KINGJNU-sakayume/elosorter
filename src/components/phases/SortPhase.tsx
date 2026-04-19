@@ -110,9 +110,6 @@ export default function SortPhase({ player }: Props) {
     if (player.isPlaying) {
       player.toggle();
     }
-    document.querySelectorAll('audio').forEach(a => {
-      try { a.pause(); a.currentTime = 0; } catch { /* ignore */ }
-    });
   }, [player]);
 
   // 현재 쌍에 대한 duration 보강 (durationMs가 없는 레거시 곡만 대상)
