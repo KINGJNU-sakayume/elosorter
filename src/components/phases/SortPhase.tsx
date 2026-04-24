@@ -1,28 +1,20 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useKeyboard } from '../../hooks/useKeyboard';
+import { useCloudSave } from '../../hooks/useCloudSave';
 import { computeElo, pairKey, getNextPair, computeRSI } from '../../utils/elo';
-import { loadConfig, saveState, serializeState } from '../../utils/config';
-import { saveToSupabase } from '../../utils/supabase';
+import { loadConfig, saveState, AUTOSAVE_EVERY_N } from '../../utils/config';
 import { fetchTrackDurations } from '../../utils/spotify';
-import { useSpotifyAuth } from '../../hooks/useSpotifyAuth';
 import AudioPlayer from '../AudioPlayer';
+import { fmtDuration } from '../../utils/format';
 import type { PlayerState, Track } from '../../utils/types';
 
 interface Props {
   player: PlayerState & { play: (uri: string) => Promise<void>; toggle: () => void };
+  getToken: () => Promise<string | null>;
 }
 
 const FINE_MODE_THRESHOLD = 150;
-const AUTOSAVE_EVERY_N = 10;   // 🆕 티어 분류와 통일
-
-function fmtDuration(ms?: number): string {
-  if (!ms || ms <= 0) return '';
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${r < 10 ? '0' : ''}${r}`;
-}
 
 interface CmpCardProps {
   track: Track;
@@ -45,15 +37,29 @@ function CmpCard({ track, onClick, locked, coverClickable, fullPlayer }: CmpCard
     >
       <div
         onClick={() => canClickCover && onClick()}
+        role={canClickCover ? 'button' : undefined}
+        aria-label={canClickCover ? `${track.name} 선택` : undefined}
+        tabIndex={canClickCover && !locked ? 0 : undefined}
+        onKeyDown={e => { if (canClickCover && !locked && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(); } }}
         style={{
           position: 'relative', width: '100%', aspectRatio: '1/1', overflow: 'hidden',
           cursor: canClickCover ? 'pointer' : 'default', flexShrink: 0,
           borderBottom: '1px solid var(--border)',
         }}
-        onMouseEnter={e => { if (canClickCover) e.currentTarget.style.opacity = '0.92'; }}
-        onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+        onMouseEnter={e => { if (canClickCover) { (e.currentTarget.querySelector('.cover-hint') as HTMLElement | null)?.style && ((e.currentTarget.querySelector('.cover-hint') as HTMLElement).style.opacity = '1'); } }}
+        onMouseLeave={e => { if (canClickCover) { (e.currentTarget.querySelector('.cover-hint') as HTMLElement | null)?.style && ((e.currentTarget.querySelector('.cover-hint') as HTMLElement).style.opacity = '0'); } }}
       >
         {track.image && <img src={track.image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+        {canClickCover && (
+          <div className="cover-hint" style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.45)', opacity: 0, transition: 'opacity 0.15s', pointerEvents: 'none',
+          }}>
+            <span style={{ color: '#fff', fontSize: '0.8rem', fontFamily: '"DM Sans", sans-serif', fontWeight: 600, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+              클릭하여 선택
+            </span>
+          </div>
+        )}
       </div>
 
       <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0 }}>
@@ -88,20 +94,16 @@ function CmpCard({ track, onClick, locked, coverClickable, fullPlayer }: CmpCard
   );
 }
 
-export default function SortPhase({ player }: Props) {
+export default function SortPhase({ player, getToken }: Props) {
   const { state, dispatch, showToast } = useApp();
   const { tracks, curPair, isChoosing, compCount, rsiDeltas, seenPairs, currentSource, sortHistory } = state;
-  const { getToken } = useSpotifyAuth();
   const cfg = loadConfig();
+  const { saveStatus, lastSavedAt, lastSavedCount, runCloudSave } = useCloudSave(state, cfg, showToast);
 
   const rsi = computeRSI(rsiDeltas);
   const A = curPair?.[0];
   const B = curPair?.[1];
   const isFineMode = A && B ? Math.abs(A.rating - B.rating) < FINE_MODE_THRESHOLD : false;
-
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const [lastSavedCount, setLastSavedCount] = useState(compCount);
 
   const unsavedCount = compCount - lastSavedCount;
   const hasUnsaved = unsavedCount > 0;
@@ -128,36 +130,10 @@ export default function SortPhase({ player }: Props) {
       .catch(e => { console.warn('[SortPhase] 트랙 보강 실패:', e); });
   }, [A?.id, B?.id, getToken, dispatch]);
 
-  // 저장
-  const savingRef = useRef(false);
-  const runCloudSave = useCallback(async (reason: 'auto' | 'manual') => {
-    if (savingRef.current) return;
-    if (!cfg.supabaseUrl || !cfg.anonKey) return;
-    const userId = state.user?.id;
-    if (!userId) return;  // 로그인 전이면 클라우드 저장 skip (로컬 저장은 유지됨)
-    savingRef.current = true;
-    setSaveStatus('saving');
-    const data = serializeState(state);
-    const curCompCount = state.compCount;
-    try {
-      const r = await saveToSupabase(data, cfg, userId);
-      setSaveStatus(r.ok ? 'ok' : 'error');
-      if (r.ok) {
-        setLastSavedAt(new Date());
-        setLastSavedCount(curCompCount);
-        if (reason === 'manual') showToast('☁️ Supabase에 저장됨');
-      } else if (reason === 'manual') {
-        showToast('❌ 저장 실패');
-      }
-    } finally {
-      savingRef.current = false;
-    }
-  }, [cfg, state, showToast]);
-
-  // 🆕 자동저장: 10회 비교마다
+  // 자동저장: 10회 비교마다
   useEffect(() => {
     if (compCount === 0) return;
-    if (unsavedCount >= AUTOSAVE_EVERY_N) { runCloudSave('auto'); }
+    if (unsavedCount >= AUTOSAVE_EVERY_N) { runCloudSave('auto', compCount); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compCount]);
 
@@ -184,6 +160,11 @@ export default function SortPhase({ player }: Props) {
     const key = pairKey(a.id, b.id);
     const newSeen = new Set(seenPairs);
     newSeen.add(key);
+    // localStorage 폭증 방지: 오래된 항목부터 제거해 상한 유지
+    if (newSeen.size > 1000) {
+      const iter = newSeen.values();
+      newSeen.delete(iter.next().value!);
+    }
     const newTracks = tracks.map(t => t.id === a.id ? updatedA : t.id === b.id ? updatedB : t);
     const nextPair = getNextPair(newTracks, newSeen, key);
     dispatch({
@@ -229,11 +210,11 @@ export default function SortPhase({ player }: Props) {
   const isConverged = rsi !== null && rsi < 10;
 
   const fineBtns = [
-    { label: 'A 훨씬 좋다', key: '1', score: 1.0 },
-    { label: 'A 약간',      key: '2', score: 0.7 },
+    { label: 'A 훨씬 우세', key: '1', score: 1.0 },
+    { label: 'A 약간 우세', key: '2', score: 0.7 },
     { label: '비슷하다',    key: '3', score: 0.5 },
-    { label: 'B 약간',      key: '4', score: 0.3 },
-    { label: 'B 훨씬 좋다', key: '5', score: 0.0 },
+    { label: 'B 약간 우세', key: '4', score: 0.3 },
+    { label: 'B 훨씬 우세', key: '5', score: 0.0 },
   ];
   const fastBtns = [
     { label: 'A 선택',    key: '1', score: 1.0 },
@@ -290,7 +271,7 @@ export default function SortPhase({ player }: Props) {
         <SaveIndicator />
         {cfg.supabaseUrl && (
           <button
-            onClick={() => runCloudSave('manual')}
+            onClick={() => runCloudSave('manual', compCount)}
             disabled={saveStatus === 'saving' || !hasUnsaved}
             style={{
               padding: '5px 12px', borderRadius: 6,
@@ -307,7 +288,7 @@ export default function SortPhase({ player }: Props) {
 
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, padding: '10px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10 }}
-        title="최근 비교들의 평균 점수 변동. 100%에 가까울수록 순위가 확정됩니다"
+        title="최근 20회 비교에서 점수가 얼마나 변했는지를 나타냅니다. 변화가 적을수록 높은 수치이며, 80% 이상이면 랭킹이 충분히 수렴된 상태입니다."
       >
         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>정렬 안정도</span>
         <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--bg-sub)', overflow: 'hidden' }}>
@@ -352,6 +333,7 @@ export default function SortPhase({ player }: Props) {
             key={b.key}
             onClick={() => handleChoose(b.score)}
             disabled={isChoosing}
+            aria-keyshortcuts={b.key}
             style={{
               padding: '14px 10px', borderRadius: 10,
               border: '1px solid var(--border)',

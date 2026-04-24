@@ -1,6 +1,22 @@
 import { useApp } from '../../context/AppContext';
 import type { Track } from '../../utils/types';
 
+function exportCSV(sorted: Track[]) {
+  const header = 'rank,name,artists,album,tier,rating,comparisons';
+  const rows = sorted.map((t, i) => {
+    const escape = (s: string) => `"${s.replace(/"/g, '""')}"`;
+    return [i + 1, escape(t.name), escape(t.artists.join(', ')), escape(t.album), t.tier ?? '', Math.round(t.rating), t.comparisons].join(',');
+  });
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'elo-ranking.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function RankPhase() {
   const { state, dispatch } = useApp();
   const { tracks, compCount } = state;
@@ -30,6 +46,10 @@ export default function RankPhase() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => exportCSV(sorted)}
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8rem' }}>
+            ↓ CSV 내보내기
+          </button>
           <button onClick={() => dispatch({ type: 'SET_PHASE', payload: 'sort' })}
             style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8rem' }}>
             ⚔️ 계속 정렬

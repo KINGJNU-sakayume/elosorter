@@ -2,6 +2,10 @@ import type { Config, AppState } from './types';
 
 const CFG_KEY = 'eloConfig';
 
+export const AUTOSAVE_EVERY_N = 10;
+
+export const NEW_TRACK_THRESHOLD = 8;
+
 // 빌드 시 주입되는 기본값 (환경변수 또는 하드코딩)
 // Vite는 VITE_ 접두사가 붙은 환경변수만 클라이언트에 노출합니다.
 const DEFAULTS = {
