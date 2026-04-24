@@ -1,17 +1,11 @@
 import { probit } from './probit';
+import { NEW_TRACK_THRESHOLD } from './config';
 import type { Track } from './types';
 
 const ELO_FLOOR = 800;
 export const TIER_PMID: Record<number, number> = { 1: 0.95, 2: 0.70, 3: 0.25 };
 const SIGMA = 200;
 const BOUNDARIES = [1700, 1500];
-/**
- * isNew 플래그가 해제되는 비교 횟수 임계치.
- * - getNextPair: isNew 곡 중 comparisons < NEW_TRACK_THRESHOLD 인 것만 우선 페어링
- * - CHOOSE_DONE reducer: 비교 후 comparisons >= NEW_TRACK_THRESHOLD 이면 isNew 해제
- * 두 조건은 반드시 대칭이어야 함.
- */
-export const NEW_TRACK_THRESHOLD = 8;
 
 export function initRating(tier: 1 | 2 | 3): number {
   return Math.round(1500 + SIGMA * probit(TIER_PMID[tier]));

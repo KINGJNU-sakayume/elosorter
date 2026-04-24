@@ -32,10 +32,10 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-page)', color: 'var(--text-primary)', fontFamily: '"DM Sans", sans-serif' }}>
-      <Header />
+      <Header onSettings={() => setSettingsOpen(true)} />
       {phase === 'import' && <ImportPhase />}
       {phase === 'tier'   && <TierPhase player={player} />}
-      {phase === 'sort'   && <SortPhase player={player} />}
+      {phase === 'sort'   && <SortPhase player={player} getToken={getToken} />}
       {phase === 'rank'   && <RankPhase />}
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={() => setSettingsOpen(false)} />
     </div>

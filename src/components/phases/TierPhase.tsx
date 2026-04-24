@@ -1,24 +1,20 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useKeyboard } from '../../hooks/useKeyboard';
-import { loadConfig, saveState, serializeState } from '../../utils/config';
-import { saveToSupabase } from '../../utils/supabase';
+import { useCloudSave } from '../../hooks/useCloudSave';
+import { loadConfig, saveState, serializeState, AUTOSAVE_EVERY_N } from '../../utils/config';
 import type { PlayerState } from '../../utils/types';
 
 interface Props {
   player: PlayerState & { play: (uri: string) => Promise<void>; toggle: () => void };
 }
 
-// 자동 저장: N번 배정마다 저장
-const AUTOSAVE_EVERY_N = 10;
 
 export default function TierPhase({ player }: Props) {
   const { state, dispatch, showToast } = useApp();
   const { tracks, tierHistory } = state;
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const [lastSavedCount, setLastSavedCount] = useState(0);
   const cfg = loadConfig();
+  const { saveStatus, lastSavedAt, lastSavedCount, runCloudSave } = useCloudSave(state, cfg, showToast);
 
   const untiered = tracks.filter(t => t.tier === null);
   const done = tracks.length - untiered.length;
@@ -37,33 +33,6 @@ export default function TierPhase({ player }: Props) {
   const unsavedCount = done - lastSavedCount;
   const hasUnsaved = unsavedCount > 0;
 
-  // 저장 함수 (중복 호출 방지용 ref)
-  const savingRef = useRef(false);
- const runCloudSave = useCallback(async (reason: 'auto' | 'manual' | 'done') => {
-    if (savingRef.current) return;
-    if (!cfg.supabaseUrl || !cfg.anonKey) return; // supabase 미설정이면 조용히 skip
-    const userId = state.user?.id;
-    if (!userId) return; // 로그인 전이면 skip
-    savingRef.current = true;
-    setSaveStatus('saving');
-    const data = serializeState(state);
-    const currentDone = state.tracks.filter(t => t.tier !== null).length;
-    try {
-      const r = await saveToSupabase(data, cfg, userId);
-      setSaveStatus(r.ok ? 'ok' : 'error');
-      if (r.ok) {
-        setLastSavedAt(new Date());
-        setLastSavedCount(currentDone);
-        if (reason === 'manual') showToast('☁️ Supabase에 저장됨');
-        else if (reason === 'done') showToast('☁️ Supabase에 저장됨');
-      } else if (reason === 'manual') {
-        showToast('❌ 저장 실패 — 네트워크를 확인해주세요');
-      }
-    } finally {
-      savingRef.current = false;
-    }
-  }, [cfg, state, showToast]);
-
   // Auto-play on track change
   useEffect(() => {
     if (!currentTrack) return;
@@ -76,7 +45,7 @@ export default function TierPhase({ player }: Props) {
   useEffect(() => {
     if (!allDone || !tracks.length) return;
     saveState(serializeState(state));
-    runCloudSave('done');
+    runCloudSave('done', done);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allDone]);
 
@@ -84,7 +53,7 @@ export default function TierPhase({ player }: Props) {
   useEffect(() => {
     if (done === 0 || allDone) return;
     if (unsavedCount >= AUTOSAVE_EVERY_N) {
-      runCloudSave('auto');
+      runCloudSave('auto', done);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
@@ -167,7 +136,7 @@ export default function TierPhase({ player }: Props) {
           <SaveStatusIndicator />
           {!allDone && done > 0 && cfg.supabaseUrl && (
             <button
-              onClick={() => runCloudSave('manual')}
+              onClick={() => runCloudSave('manual', done)}
               disabled={saveStatus === 'saving' || !hasUnsaved}
               style={{
                 padding: '4px 10px', borderRadius: 6,
@@ -197,7 +166,7 @@ export default function TierPhase({ player }: Props) {
           {saveStatus === 'error' && (
             <div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', borderRadius: 12, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ color: 'var(--danger)', fontSize: '0.88rem' }}>☁️ 저장 실패 — 네트워크를 확인해주세요</span>
-              <button onClick={() => runCloudSave('manual')} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--danger-border)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}>재시도</button>
+              <button onClick={() => runCloudSave('manual', done)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--danger-border)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}>재시도</button>
             </div>
           )}
           {saveStatus === 'ok' && <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 16 }}>☁️ 저장됨</div>}
@@ -258,11 +227,12 @@ export default function TierPhase({ player }: Props) {
                 { tier: 3 as const, label: '🎵 Tier 3 — 보통', sub: '하위 50% · P_mid = 0.25', init: '≈1365', color: 'var(--tier-3)', border: 'var(--tier-3-border)', hover: 'var(--tier-3-soft)' },
               ].map(b => (
                 <button key={b.tier} onClick={() => assignTier(b.tier)}
+                  aria-keyshortcuts={String(b.tier)}
                   style={{ ...S.tierBtn(b.color, b.border) }}
                   onMouseEnter={e => (e.currentTarget.style.background = b.hover)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(128,128,128,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"DM Mono", monospace', fontSize: '0.8rem', flexShrink: 0 }}>{b.tier}</div>
+                  <kbd style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(128,128,128,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"DM Mono", monospace', fontSize: '0.8rem', flexShrink: 0, border: '1px solid var(--border)' }}>{b.tier}</kbd>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>{b.label}</div>
                     <div style={{ fontSize: '0.78rem', opacity: 0.65, marginTop: 2 }}>{b.sub}</div>
@@ -275,7 +245,7 @@ export default function TierPhase({ player }: Props) {
             <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
               <button disabled={tierHistory.length === 0} onClick={undoTier}
                 style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8rem', opacity: tierHistory.length === 0 ? 0.4 : 1 }}>
-                ↩ 되돌리기 (Z)
+                ↩ 되돌리기 <kbd style={{ fontFamily: '"DM Mono", monospace', fontSize: '0.7rem', marginLeft: 4, color: 'var(--text-tertiary)', padding: '1px 5px', border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-sub)' }}>Z</kbd>
               </button>
               {done > 0 && (
                 <button onClick={() => dispatch({ type: 'BULK_ASSIGN_REMAINING', payload: { tier: 3 } })}

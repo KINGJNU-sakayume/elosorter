@@ -1,12 +1,5 @@
 import type { Track } from '../utils/types';
-
-function fmtTime(ms: number): string {
-  if (!isFinite(ms) || ms < 0) return '0:00';
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${r < 10 ? '0' : ''}${r}`;
-}
+import { fmtDuration } from '../utils/format';
 
 interface FullPlayer {
   isPlaying: boolean;
@@ -64,7 +57,7 @@ export default function AudioPlayer({ track, fullPlayer, fullIsCurrent }: Props)
       </div>
       {hasDuration && (
         <div style={{ fontSize: '0.72rem', fontFamily: '"DM Mono", monospace', color: 'var(--text-tertiary)', minWidth: 44, textAlign: 'right', whiteSpace: 'nowrap' }}>
-          {fmtTime(track.durationMs!)}
+          {fmtDuration(track.durationMs!)}
         </div>
       )}
     </div>

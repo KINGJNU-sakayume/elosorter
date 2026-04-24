@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useRef, useState } from 'react';
 import type { AppState, AppAction, Track } from '../utils/types';
-import { getNextPair, initRating, NEW_TRACK_THRESHOLD } from '../utils/elo';
+import { getNextPair, initRating } from '../utils/elo';
+import { NEW_TRACK_THRESHOLD } from '../utils/config';
 const initial: AppState = {
   phase: 'import',
   tracks: [],
@@ -197,20 +198,36 @@ export const AppContext = createContext<ContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((msg: string, dur = 2800) => {
-    const el = document.getElementById('toast');
-    if (!el) return;
-    el.textContent = msg;
-    el.classList.add('show');
+    setToastMsg(msg);
+    setToastVisible(true);
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => el.classList.remove('show'), dur);
+    timerRef.current = setTimeout(() => setToastVisible(false), dur);
   }, []);
 
   return (
     <AppContext.Provider value={{ state, dispatch, showToast }}>
       {children}
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: 'fixed', bottom: 24, left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--toast-bg)', color: 'var(--toast-fg)',
+          border: '1px solid var(--border-strong)',
+          borderRadius: 10, padding: '10px 20px',
+          fontSize: '0.875rem', pointerEvents: 'none',
+          opacity: toastVisible ? 1 : 0, transition: 'opacity 0.25s',
+          zIndex: 999, whiteSpace: 'nowrap',
+        }}
+      >
+        {toastMsg}
+      </div>
     </AppContext.Provider>
   );
 }
