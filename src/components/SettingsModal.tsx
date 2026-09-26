@@ -1,203 +1,113 @@
-import { useState, useEffect, useRef } from 'react';
-import { loadConfig, saveConfig } from '../utils/config';
-import type { Config } from '../utils/types';
+import { useState, type FormEvent } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
+import { loadConfig, saveConfig } from '../services/config';
+import Button from './ui/Button';
+import Modal from './ui/Modal';
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSave: (cfg: Config) => void;
+  onSaved: () => void;
 }
 
-export default function SettingsModal({ open, onClose, onSave }: Props) {
-  const [clientId, setClientId]       = useState('');
-  const [supabaseUrl, setSupabaseUrl] = useState('');
-  const [anonKey, setAnonKey]         = useState('');
-  const [showAnonKey, setShowAnonKey] = useState(false);
-  const [error, setError]             = useState<string | null>(null);
-  const redirectUri = loadConfig().redirectUri;
+export default function SettingsModal({ open, onClose, onSaved }: Props) {
+  return (
+    <Modal open={open} onClose={onClose} labelledBy="settings-title">
+      <SettingsForm onCancel={onClose} onSaved={onSaved} />
+    </Modal>
+  );
+}
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-  // onClose는 부모에서 매 렌더마다 새 화살표로 전달될 수 있음.
-  // 트랩 effect의 재실행(포커스 리셋)을 방지하기 위해 ref로 래핑.
-  const onCloseRef = useRef(onClose);
-  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+const inputCls =
+  'w-full rounded-lg border border-line-strong bg-sub px-3.5 py-2.5 font-mono text-sm text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none';
+const labelCls = 'mb-1.5 block font-mono text-xs text-fg-2';
+const helpCls = 'mt-1.5 text-xs leading-relaxed text-fg-3';
 
-  useEffect(() => {
-    if (open) {
-      const cfg = loadConfig();
-      setClientId(cfg.clientId);
-      setSupabaseUrl(cfg.supabaseUrl);
-      setAnonKey(cfg.anonKey);
-      setShowAnonKey(false);
-      setError(null);
+function validate(url: string, key: string): string | null {
+  if (url && !key) return 'Supabase URL을 입력했다면 anon key도 함께 입력하세요';
+  if (key && !url) return 'Supabase anon key를 입력했다면 URL도 함께 입력하세요';
+  if (url) {
+    try {
+      if (new URL(url).protocol !== 'https:') return 'Supabase URL은 https://로 시작해야 합니다';
+    } catch {
+      return 'Supabase URL 형식이 올바르지 않습니다';
     }
-  }, [open]);
-
-  // Escape 닫기 + Tab 포커스 트랩 + 이전 포커스 복원
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
-    const previousActive = document.activeElement as HTMLElement | null;
-    const getFocusables = () =>
-      Array.from(dialog.querySelectorAll<HTMLElement>(
-        'input, button, [href], select, textarea, [tabindex]:not([tabindex="-1"])'
-      )).filter(el => !el.hasAttribute('disabled'));
-
-    getFocusables()[0]?.focus();
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-      if (e.key !== 'Tab') return;
-      const list = getFocusables();
-      if (!list.length) return;
-      const first = list[0], last = list[list.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault(); last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault(); first.focus();
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      previousActive?.focus?.();
-    };
-  }, [open]);
-
-  if (!open) return null;
-
-  function handleSave() {
-    const c = clientId.trim();
-    const u = supabaseUrl.trim().replace(/\/$/, '');
-    const k = anonKey.trim();
-
-    // Supabase URL/anon key는 쌍으로만 의미가 있다
-    if (u && !k) { setError('Supabase URL을 입력했다면 anon key도 함께 입력하세요'); return; }
-    if (k && !u) { setError('Supabase anon key를 입력했다면 URL도 함께 입력하세요'); return; }
-    // URL 형식 검사
-    if (u) {
-      try {
-        const parsed = new URL(u);
-        if (parsed.protocol !== 'https:') { setError('Supabase URL은 https://로 시작해야 합니다'); return; }
-      } catch {
-        setError('Supabase URL 형식이 올바르지 않습니다'); return;
-      }
-    }
-
-    setError(null);
-    const cfg = saveConfig({ clientId: c, supabaseUrl: u, anonKey: k });
-    onSave(cfg);
-    onClose();
   }
+  return null;
+}
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 14px',
-    background: 'var(--bg-sub)', border: '1px solid var(--border-strong)',
-    borderRadius: 8, color: 'var(--text-primary)',
-    fontFamily: '"DM Mono", monospace', fontSize: '0.85rem',
-    outline: 'none',
-  };
-  const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)',
-    marginBottom: 6, fontFamily: '"DM Mono", monospace',
+/** 모달이 열릴 때마다 새로 마운트되어 저장된 값에서 시작한다 */
+function SettingsForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => void }) {
+  const initial = loadConfig();
+  const [clientId, setClientId] = useState(initial.clientId);
+  const [supabaseUrl, setSupabaseUrl] = useState(initial.supabaseUrl);
+  const [anonKey, setAnonKey] = useState(initial.anonKey);
+  const [showKey, setShowKey] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const url = supabaseUrl.trim().replace(/\/+$/, '');
+    const key = anonKey.trim();
+    const problem = validate(url, key);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    saveConfig({ clientId: clientId.trim(), supabaseUrl: url, anonKey: key });
+    onSaved();
   };
 
   return (
-    <div
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'var(--overlay-bg)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-title"
-        style={{ background: 'var(--bg-section)', border: '1px solid var(--border-strong)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}
-      >
-        <h2 id="settings-title" style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 6 }}>⚙️ 설정</h2>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 24, lineHeight: 1.6 }}>
-          Spotify Developer Dashboard와 Supabase에서 발급받은 정보를 입력하세요.<br />
-          한 번 입력하면 브라우저에 저장됩니다.
-        </p>
+    <form onSubmit={submit} noValidate>
+      <h2 id="settings-title" className="text-lg font-bold">설정</h2>
+      <p className="mt-1 mb-5 text-sm leading-relaxed text-fg-2">
+        보통은 배포 시 환경변수로 들어갑니다. 여기서 입력한 값은 이 브라우저에만 저장되어 환경변수보다 우선합니다.
+      </p>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>SPOTIFY_CLIENT_ID</label>
-          <input style={inputStyle} value={clientId} onChange={e => setClientId(e.target.value)} placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 5, lineHeight: 1.5 }}>
-            <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>developer.spotify.com</a>에서 앱 생성 후 Client ID 복사<br />
-            Redirect URI에 <strong style={{ color: 'var(--text-secondary)' }}>{redirectUri}</strong> 추가 필요
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="cfg-client" className={labelCls}>SPOTIFY_CLIENT_ID</label>
+          <input id="cfg-client" className={inputCls} value={clientId} onChange={e => setClientId(e.target.value)}
+            placeholder="32자리 Client ID" autoComplete="off" spellCheck={false} />
+          <p className={helpCls}>
+            <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">
+              developer.spotify.com
+            </a>
+            에서 앱을 만든 뒤 Redirect URI에 <code className="break-all text-fg-2">{initial.redirectUri}</code> 를 추가하세요.
           </p>
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>SUPABASE_URL</label>
-          <input style={inputStyle} value={supabaseUrl} onChange={e => setSupabaseUrl(e.target.value)} placeholder="https://xxxx.supabase.co" />
+        <div>
+          <label htmlFor="cfg-url" className={labelCls}>SUPABASE_URL <span className="text-fg-3">(선택)</span></label>
+          <input id="cfg-url" className={inputCls} value={supabaseUrl} onChange={e => setSupabaseUrl(e.target.value)}
+            placeholder="https://xxxx.supabase.co" autoComplete="off" spellCheck={false} inputMode="url" />
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>SUPABASE_ANON_KEY</label>
-          <div style={{ position: 'relative' }}>
-            <input
-              type={showAnonKey ? 'text' : 'password'}
-              style={{ ...inputStyle, paddingRight: 44 }}
-              value={anonKey}
-              onChange={e => setAnonKey(e.target.value)}
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              onClick={() => setShowAnonKey(v => !v)}
-              aria-label={showAnonKey ? 'anon key 숨기기' : 'anon key 보기'}
-              style={{
-                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: 'var(--text-tertiary)', padding: 6,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              {showAnonKey ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-              )}
+        <div>
+          <label htmlFor="cfg-key" className={labelCls}>SUPABASE_ANON_KEY <span className="text-fg-3">(선택)</span></label>
+          <div className="relative">
+            <input id="cfg-key" type={showKey ? 'text' : 'password'} className={`${inputCls} pr-11`} value={anonKey}
+              onChange={e => setAnonKey(e.target.value)} placeholder="eyJhbGciOi…" autoComplete="off" spellCheck={false} />
+            <button type="button" onClick={() => setShowKey(v => !v)} aria-label={showKey ? 'anon key 숨기기' : 'anon key 보기'}
+              className="absolute top-1/2 right-2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-fg-3 hover:text-fg">
+              {showKey ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
             </button>
           </div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 5 }}>Supabase → Settings → API → anon public key</p>
-        </div>
-
-        {error && (
-          <div
-            role="alert"
-            style={{
-              marginTop: 12, padding: '10px 14px',
-              background: 'var(--danger-soft)',
-              border: '1px solid var(--danger-border)',
-              borderRadius: 8, color: 'var(--danger-text)',
-              fontSize: '0.8rem',
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>
-          <button onClick={onClose} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.875rem' }}>취소</button>
-          <button onClick={handleSave} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#000', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}>저장</button>
+          <p className={helpCls}>Supabase → Project Settings → API → anon public key. 비워 두면 이 브라우저에만 저장됩니다.</p>
         </div>
       </div>
-    </div>
+
+      {error && (
+        <p role="alert" className="mt-4 rounded-lg border border-danger-line bg-danger-soft px-3.5 py-2.5 text-sm text-danger-fg">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-6 flex justify-end gap-2">
+        <Button onClick={onCancel}>취소</Button>
+        <Button type="submit" variant="primary">저장</Button>
+      </div>
+    </form>
   );
 }

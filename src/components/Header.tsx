@@ -1,127 +1,85 @@
-import { useApp } from '../context/AppContext';
-import { useTheme } from '../context/ThemeContext';
-import type { Phase } from '../utils/types';
+import { Layers, Library, Moon, Settings, Sun, Swords, Trophy } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { canEnter, type Phase } from '../state/reducer';
+import { useAppDispatch, useAppState } from '../state/context';
+import { useTheme } from '../theme/context';
+import SaveIndicator from './SaveIndicator';
 
-const TABS: { id: Phase; label: string; step: string }[] = [
-  { id: 'import', label: '불러오기', step: '↑' },
-  { id: 'tier',   label: '티어 분류', step: '1' },
-  { id: 'sort',   label: '비교 정렬', step: '2' },
-  { id: 'rank',   label: '랭킹',      step: '3' },
+const STEPS: { id: Phase; label: string; icon: LucideIcon; locked: string }[] = [
+  { id: 'import', label: '불러오기', icon: Library, locked: '' },
+  { id: 'tier', label: '티어 분류', icon: Layers, locked: '먼저 곡을 불러오세요' },
+  { id: 'sort', label: '비교 정렬', icon: Swords, locked: '티어를 2곡 이상 분류하면 열립니다' },
+  { id: 'rank', label: '랭킹', icon: Trophy, locked: '티어를 분류하면 열립니다' },
 ];
 
-interface Props {
-  onSettings?: () => void;
-}
-
-export default function Header({ onSettings }: Props) {
-  const { state, dispatch } = useApp();
+export default function Header({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const { phase, session } = useAppState();
+  const dispatch = useAppDispatch();
   const { theme, toggle } = useTheme();
-  const { phase, tracks } = state;
-  const hasData = tracks.length > 0;
-
-  function goPhase(p: Phase) {
-    if (!hasData && p !== 'import') return;
-    dispatch({ type: 'SET_PHASE', payload: p });
-  }
+  const untiered = session.tracks.filter(t => t.tier === null).length;
 
   return (
-    <div
-      style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--header-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', gap: 12 }}
-    >
-      <div style={{
-        fontFamily: '"DM Mono", monospace',
-        color: 'var(--accent)',
-        fontSize: '0.95rem',
-        letterSpacing: '0.05em',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        flexShrink: 0,
-      }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }} />
-        ELO SORTER
+    <header className="sticky top-0 z-40 border-b border-line bg-header pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-4">
+        <div className="flex shrink-0 items-center gap-2 font-mono text-sm tracking-wider text-accent">
+          <span className="size-2 rounded-full bg-accent shadow-[0_0_8px_var(--accent)]" aria-hidden />
+          <span className="hidden sm:inline">ELO SORTER</span>
+        </div>
+
+        <nav aria-label="단계" className="ml-auto flex min-w-0 items-center gap-0.5">
+          {STEPS.map((step, i) => {
+            const enabled = canEnter(step.id, session);
+            const active = phase === step.id;
+            const Icon = step.icon;
+            const badge = step.id === 'tier' && untiered > 0 && session.tracks.length > 0 ? untiered : null;
+            return (
+              <button
+                key={step.id}
+                type="button"
+                disabled={!enabled}
+                aria-current={active ? 'step' : undefined}
+                title={enabled ? `${i}. ${step.label}` : step.locked}
+                onClick={() => dispatch({ type: 'setPhase', phase: step.id })}
+                className={`relative flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-[0.82rem] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-30 sm:px-3 ${
+                  active
+                    ? 'border-line bg-sub text-accent'
+                    : 'border-transparent text-fg-2 enabled:hover:bg-sub enabled:hover:text-fg'
+                }`}
+              >
+                <Icon size={16} aria-hidden />
+                <span className="sr-only md:not-sr-only">{step.label}</span>
+                {badge !== null && (
+                  <span className="rounded-full bg-t1-soft px-1.5 font-mono text-[0.65rem] leading-4 text-t1" aria-label={`미분류 ${badge}곡`}>
+                    {badge > 999 ? '999+' : badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="flex shrink-0 items-center gap-0.5 border-l border-line pl-1 sm:pl-2">
+          <SaveIndicator />
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            aria-label="설정 (Ctrl+,)"
+            title="설정 (Ctrl+,)"
+            className="flex size-8 items-center justify-center rounded-lg text-fg-2 hover:bg-sub hover:text-fg"
+          >
+            <Settings size={16} aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            className="flex size-8 items-center justify-center rounded-lg text-fg-2 hover:bg-sub hover:text-fg"
+          >
+            {theme === 'dark' ? <Sun size={16} aria-hidden /> : <Moon size={16} aria-hidden />}
+          </button>
+        </div>
       </div>
-
-      <nav style={{ display: 'flex', gap: 2, marginLeft: 'auto', overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {TABS.map(tab => {
-          const locked = !hasData && tab.id !== 'import';
-          const active = phase === tab.id;
-          return (
-            <button
-              key={tab.id}
-              disabled={locked}
-              onClick={() => goPhase(tab.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 14px', borderRadius: 6,
-                border: '1px solid ' + (active ? 'var(--border)' : 'transparent'),
-                background: active ? 'var(--bg-sub)' : 'transparent',
-                color: active ? 'var(--accent)' : 'var(--text-secondary)',
-                fontFamily: '"DM Sans", sans-serif', fontSize: '0.82rem', fontWeight: 500,
-                cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.3 : 1,
-                whiteSpace: 'nowrap', transition: 'all 0.15s',
-              }}
-            >
-              <span style={{ width: 18, height: 18, borderRadius: '50%', background: active ? 'var(--accent)' : 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontFamily: '"DM Mono", monospace', color: active ? '#000' : 'var(--text-secondary)' }}>
-                {tab.step}
-              </span>
-              {tab.label}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* 설정 버튼 */}
-      {onSettings && (
-        <button
-          onClick={onSettings}
-          aria-label="설정 열기 (Ctrl+,)"
-          title="설정 (Ctrl+,)"
-          style={{
-            width: 32, height: 32, borderRadius: 6,
-            border: '1px solid transparent', background: 'transparent',
-            color: 'var(--text-secondary)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-sub)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
-      )}
-
-      {/* 테마 토글 */}
-      <button
-        onClick={toggle}
-        aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
-        title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
-        style={{
-          width: 32, height: 32, borderRadius: 6,
-          border: '1px solid transparent', background: 'transparent',
-          color: 'var(--text-secondary)', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0, transition: 'all 0.15s',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-sub)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-      >
-        {theme === 'dark' ? (
-          // 태양 (다크 모드 → 라이트 모드로 전환)
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-          </svg>
-        ) : (
-          // 달 (라이트 모드 → 다크 모드로 전환)
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-          </svg>
-        )}
-      </button>
-    </div>
+    </header>
   );
 }

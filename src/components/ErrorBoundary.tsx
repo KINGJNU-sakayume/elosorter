@@ -1,16 +1,23 @@
-import { Component } from 'react';
-import type { ErrorInfo, ReactNode } from 'react';
-
-interface Props {
-  children: ReactNode;
-}
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface State {
   error: Error | null;
   showDetails: boolean;
 }
 
-export default class ErrorBoundary extends Component<Props, State> {
+function downloadRawSession() {
+  const raw = localStorage.getItem('eloState');
+  if (!raw) return;
+  const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'elo-sorter-recovery.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** 렌더링 오류가 나도 저장된 진행 상황을 잃지 않도록 새로고침·원본 데이터 내려받기를 제공한다 */
+export default class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   state: State = { error: null, showDetails: false };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
@@ -18,85 +25,44 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[ErrorBoundary]', error, info);
+    console.error('[ErrorBoundary]', error, info.componentStack);
   }
 
   render() {
     const { error, showDetails } = this.state;
     if (!error) return this.props.children;
+    const hasData = (() => {
+      try { return !!localStorage.getItem('eloState'); } catch { return false; }
+    })();
 
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'var(--bg-page)',
-        color: 'var(--text-primary)',
-        fontFamily: '"DM Sans", sans-serif',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-      }}>
-        <div style={{
-          maxWidth: 520,
-          width: '100%',
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border)',
-          borderRadius: 16,
-          padding: 28,
-        }}>
-          <div style={{ fontSize: '2rem', marginBottom: 12 }}>⚠</div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: 10 }}>
-            문제가 발생했습니다
-          </h2>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
-            앱 렌더링 중 예상치 못한 오류가 났습니다. 대부분의 진행상황은 로컬에 저장돼 있어 새로고침 후 이어할 수 있습니다.
+      <div className="flex min-h-dvh items-center justify-center bg-page p-6 text-fg">
+        <div className="w-full max-w-lg rounded-2xl border border-line bg-card p-7">
+          <h1 className="text-xl font-bold">문제가 발생했습니다</h1>
+          <p className="mt-2 text-sm leading-relaxed text-fg-2">
+            화면을 그리는 중 예상치 못한 오류가 났습니다. 진행 상황은 브라우저에 저장돼 있으니 새로고침하면 대부분 이어서 할 수 있습니다.
           </p>
-
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-            <button
-              onClick={() => window.location.reload()}
-              style={{
-                padding: '10px 20px', borderRadius: 8, border: 'none',
-                background: 'var(--accent)', color: '#000',
-                fontFamily: '"DM Sans", sans-serif', fontSize: '0.9rem', fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button type="button" onClick={() => window.location.reload()}
+              className="h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-fg">
               새로고침
             </button>
-            <button
-              onClick={() => this.setState({ showDetails: !showDetails })}
-              style={{
-                padding: '10px 16px', borderRadius: 8,
-                border: '1px solid var(--border)', background: 'transparent',
-                color: 'var(--text-secondary)',
-                fontFamily: '"DM Sans", sans-serif', fontSize: '0.85rem',
-                cursor: 'pointer',
-              }}
-            >
+            {hasData && (
+              <button type="button" onClick={downloadRawSession}
+                className="h-10 rounded-lg border border-line px-4 text-sm text-fg-2 hover:bg-sub">
+                저장 데이터 내려받기
+              </button>
+            )}
+            <button type="button" onClick={() => this.setState({ showDetails: !showDetails })}
+              className="h-10 rounded-lg px-3 text-sm text-fg-3 hover:bg-sub">
               {showDetails ? '상세 숨기기' : '상세 보기'}
             </button>
           </div>
-
           {showDetails && (
-            <div style={{
-              background: 'var(--bg-sub)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              padding: 14,
-              fontFamily: '"DM Mono", monospace',
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              maxHeight: 240,
-              overflow: 'auto',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}>
-              <div style={{ color: 'var(--danger)', marginBottom: 6 }}>
-                {error.name}: {error.message}
-              </div>
-              {error.stack && <div style={{ opacity: 0.7 }}>{error.stack}</div>}
-            </div>
+            <pre className="mt-4 max-h-60 overflow-auto rounded-lg border border-line bg-sub p-3 font-mono text-xs break-words whitespace-pre-wrap text-fg-2">
+              <span className="text-danger">{error.name}: {error.message}</span>
+              {error.stack && `\n\n${error.stack}`}
+            </pre>
           )}
         </div>
       </div>
