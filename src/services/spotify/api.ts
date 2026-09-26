@@ -7,16 +7,24 @@ const API = 'https://api.spotify.com/v1';
 
 export class SpotifyApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** 429 응답의 Retry-After (ms). 없으면 null */
+  readonly retryAfterMs: number | null;
+  constructor(status: number, message: string, retryAfterMs: number | null = null) {
     super(message);
     this.status = status;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-/** 401이면 토큰을 한 번 갱신, 429/5xx면 기다렸다가 재시도 */
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+const TOO_MANY = 'Spotify 요청이 너무 많습니다. 잠시 후 다시 시도하세요';
+
+/**
+ * 401이면 토큰을 한 번 갱신, 429/5xx면 기다렸다가 재시도.
+ * retry = false면 429/5xx를 바로 던진다 (재시도할지는 호출하는 쪽이 정함).
+ */
+async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   let refreshed = false;
   for (let attempt = 0; attempt < 5; attempt++) {
     const token = await auth.getToken();
@@ -37,12 +45,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
     if (res.status === 429 || res.status >= 500) {
       const retryAfter = Number(res.headers.get('Retry-After'));
-      await sleep(retryAfter > 0 ? Math.min(retryAfter, 30) * 1000 : 500 * 2 ** attempt);
+      const retryAfterMs = retryAfter > 0 ? retryAfter * 1000 : null;
+      if (!retry) {
+        throw new SpotifyApiError(res.status, res.status === 429 ? TOO_MANY : `Spotify API 오류 (${res.status})`, retryAfterMs);
+      }
+      await sleep(retryAfterMs ? Math.min(retryAfterMs, 30_000) : 500 * 2 ** attempt);
       continue;
     }
     throw new SpotifyApiError(res.status, `Spotify API 오류 (${res.status})`);
   }
-  throw new SpotifyApiError(429, 'Spotify 요청이 너무 많습니다. 잠시 후 다시 시도하세요');
+  throw new SpotifyApiError(429, TOO_MANY);
 }
 
 interface Page {
@@ -148,19 +160,39 @@ export async function fetchDurations(ids: readonly string[]): Promise<{ id: stri
   return out;
 }
 
-/** Web Playback SDK 기기에서 곡 재생. 기기가 막 준비됐을 때의 일시적 404는 한 번 재시도 */
+/**
+ * Web Playback SDK 기기에서 곡 재생. 한 번만 보낸다 — 재시도는 플레이어의 재생 요청 줄(playQueue)이
+ * playRetryDelay에 따라, 기다리는 사이 사용자가 넘긴 최신 곡으로 한다.
+ * (예전에는 여기서 429를 최대 30초씩 기다렸다가 같은 곡을 다시 보내서, 빠르게 넘기면
+ * 지나간 곡들의 재시도가 요청 제한을 계속 붙잡아 지금 곡이 재생되지 않았다.)
+ */
 export async function playOnDevice(deviceId: string, uri: string): Promise<void> {
-  const call = () =>
-    request(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
+  await request(
+    `/me/player/play?device_id=${encodeURIComponent(deviceId)}`,
+    {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ uris: [uri] }),
-    });
-  try {
-    await call();
-  } catch (e) {
-    if (!(e instanceof SpotifyApiError) || e.status !== 404) throw e;
-    await sleep(600);
-    await call();
+    },
+    false,
+  );
+}
+
+/** Retry-After가 이보다 길면 기다리지 않고 실패로 알린다 */
+const PLAY_MAX_RETRY_AFTER_MS = 30_000;
+const PLAY_MAX_BACKOFF_MS = 16_000;
+
+/**
+ * 재생 요청 실패 후 다음 요청까지 기다릴 시간(ms). null이면 다시 보내도 소용없는 오류.
+ * streak은 연속 실패 횟수. 429는 Retry-After를 따르고(브라우저에 노출되지 않으면 1·2·4·8초…),
+ * 기기가 막 준비됐을 때의 일시적 404와 5xx는 0.6초부터 늘려 간다.
+ */
+export function playRetryDelay(error: unknown, streak: number): number | null {
+  if (!(error instanceof SpotifyApiError)) return null;
+  if (error.status === 429) {
+    const wait = error.retryAfterMs ?? Math.min(1000 * 2 ** streak, PLAY_MAX_BACKOFF_MS);
+    return wait > PLAY_MAX_RETRY_AFTER_MS ? null : wait;
   }
+  if (error.status === 404 || error.status >= 500) return Math.min(600 * 2 ** streak, PLAY_MAX_BACKOFF_MS);
+  return null;
 }

@@ -1,6 +1,6 @@
-import { Pause, Play } from 'lucide-react';
+import { LoaderCircle, Pause, Play } from 'lucide-react';
 import Kbd from '../components/ui/Kbd';
-import { statusText, usePlayer } from './context';
+import { statusText, trackPlayback, usePlayer } from './context';
 
 interface Props {
   uri: string;
@@ -14,19 +14,25 @@ interface Props {
 
 export default function PlayButton({ uri, label, hotkey, size = 'md', showStatus = false }: Props) {
   const player = usePlayer();
-  const playing = player.isPlaying && player.currentUri === uri;
-  const dim = size === 'sm' ? 'size-8' : 'size-10';
+  const playback = trackPlayback(player, uri);
+  const playing = playback === 'playing';
+  const icon = size === 'sm' ? 14 : 18;
+  const action = playback === 'pending' ? '재생 취소' : playing ? '일시정지' : '재생';
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <button
         type="button"
         onClick={() => player.toggle(uri)}
         disabled={player.status !== 'ready'}
-        aria-label={`${label} ${playing ? '일시정지' : '재생'}`}
+        aria-label={`${label} ${action}`}
         aria-keyshortcuts={hotkey}
-        className={`flex shrink-0 items-center justify-center rounded-full bg-accent text-accent-fg transition-[filter,opacity] hover:brightness-110 disabled:opacity-35 ${dim}`}
+        className={`flex shrink-0 items-center justify-center rounded-full bg-accent text-accent-fg transition-[filter,opacity] hover:brightness-110 disabled:opacity-35 ${size === 'sm' ? 'size-8' : 'size-10'}`}
       >
-        {playing ? <Pause size={size === 'sm' ? 14 : 18} fill="currentColor" aria-hidden /> : <Play size={size === 'sm' ? 14 : 18} fill="currentColor" className="translate-x-px" aria-hidden />}
+        {playback === 'pending'
+          ? <LoaderCircle size={icon} className="animate-spin" aria-hidden />
+          : playing
+            ? <Pause size={icon} fill="currentColor" aria-hidden />
+            : <Play size={icon} fill="currentColor" className="translate-x-px" aria-hidden />}
       </button>
       {showStatus && (
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-fg-2">
@@ -35,7 +41,7 @@ export default function PlayButton({ uri, label, hotkey, size = 'md', showStatus
               <span className="eq-bar" /><span className="eq-bar" /><span className="eq-bar" />
             </span>
           )}
-          <span className="truncate">{statusText(player, playing)}</span>
+          <span className="truncate">{statusText(player, playback)}</span>
           {hotkey && player.status === 'ready' && <span className="hidden sm:inline-flex"><Kbd>{hotkey}</Kbd></span>}
         </span>
       )}

@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { playOnDevice } from '../services/spotify/api';
+import { errorMessage } from '../lib/format';
+import { playOnDevice, playRetryDelay } from '../services/spotify/api';
 import { auth } from '../services/spotify/auth';
 import type { Player, PlayerStatus } from './context';
+import { createPlayQueue, type PlayQueue } from './playQueue';
 import type { SdkPlayer } from './spotify-sdk';
 
 const IS_MOBILE = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 const SDK_TIMEOUT_MS = 15_000;
+
+/**
+ * 곡이 화면에 나타난 뒤 이만큼 머물러야 자동 재생을 요청한다.
+ * 빠르게 넘기는 동안에는 요청을 아예 보내지 않아 Spotify 요청 제한(429)에 걸리지 않는다.
+ */
+export const AUTOPLAY_DELAY_MS = 1000;
 
 interface Internal {
   status: Exclude<PlayerStatus, 'off'>;
@@ -13,9 +21,18 @@ interface Internal {
   deviceId: string | null;
   isPlaying: boolean;
   currentUri: string | null;
+  pendingUri: string | null;
+  cuedUri: string | null;
 }
 
-const INITIAL: Internal = { status: 'loading', reason: null, deviceId: null, isPlaying: false, currentUri: null };
+const INITIAL: Internal = {
+  status: 'loading', reason: null, deviceId: null, isPlaying: false, currentUri: null, pendingUri: null, cuedUri: null,
+};
+
+/** SDK 조작은 기기가 없거나 곡이 없으면 거부될 수 있다 — 결과를 기다리지 않으므로 오류도 삼킨다 */
+function quiet(promise: Promise<void> | undefined): void {
+  promise?.catch(() => {});
+}
 
 /**
  * Web Playback SDK 플레이어. 로그인 상태가 true가 되는 순간 초기화한다.
@@ -27,6 +44,7 @@ export function useSpotifyPlayer(loggedIn: boolean, onError: (message: string) =
   const device = useRef<string | null>(null);
   const currentUri = useRef<string | null>(null);
   const errorRef = useRef(onError);
+  const cued = useRef<{ uri: string; timer: ReturnType<typeof setTimeout> } | null>(null);
 
   useEffect(() => {
     errorRef.current = onError;
@@ -34,11 +52,32 @@ export function useSpotifyPlayer(loggedIn: boolean, onError: (message: string) =
     currentUri.current = s.currentUri;
   });
 
+  // 재생 요청은 한 번에 하나만, 항상 마지막에 원한 곡으로 (playQueue.ts). 처음 쓸 때 만든다
+  const queueRef = useRef<PlayQueue | null>(null);
+  const queue = useCallback((): PlayQueue => queueRef.current ??= createPlayQueue({
+    send: uri => {
+      const deviceId = device.current;
+      return deviceId ? playOnDevice(deviceId, uri) : Promise.reject(new Error('플레이어가 준비되지 않았습니다'));
+    },
+    pause: () => quiet(sdk.current?.pause()),
+    retryDelay: playRetryDelay,
+    onStart: uri => setS(prev => ({
+      ...prev,
+      pendingUri: prev.pendingUri === uri ? null : prev.pendingUri,
+      currentUri: uri,
+      isPlaying: true,
+    })),
+    onError: (uri, e) => {
+      setS(prev => ({ ...prev, pendingUri: prev.pendingUri === uri ? null : prev.pendingUri, isPlaying: false }));
+      errorRef.current(`재생하지 못했습니다 (${errorMessage(e)})`);
+    },
+  }), []);
+
   useEffect(() => {
     if (!loggedIn || IS_MOBILE) return;
     let cancelled = false;
     const fail = (reason: string) => {
-      if (!cancelled) setS(prev => ({ ...prev, status: 'embed', reason, deviceId: null, isPlaying: false }));
+      if (!cancelled) setS(prev => ({ ...prev, status: 'embed', reason, deviceId: null, isPlaying: false, pendingUri: null, cuedUri: null }));
     };
 
     const init = () => {
@@ -61,10 +100,15 @@ export function useSpotifyPlayer(loggedIn: boolean, onError: (message: string) =
       player.addListener('playback_error', e => console.warn('[player] playback_error', e.message));
       player.addListener('player_state_changed', state => {
         if (cancelled) return;
+        const track = state?.track_window?.current_track;
+        // 지역별로 다른 곡 ID로 바꿔 재생(relinking)하면 요청한 URI는 linked_from에 남는다
+        const uri = track?.linked_from?.uri || track?.uri || null;
+        const playing = !!state && !state.paused;
         setS(prev => ({
           ...prev,
-          isPlaying: !!state && !state.paused,
-          currentUri: state?.track_window?.current_track?.uri ?? prev.currentUri,
+          isPlaying: playing,
+          currentUri: uri ?? prev.currentUri,
+          pendingUri: playing && uri === prev.pendingUri ? null : prev.pendingUri,
         }));
       });
       void player.connect().then(ok => { if (!ok) fail('Spotify 플레이어에 연결하지 못했습니다'); });
@@ -77,7 +121,7 @@ export function useSpotifyPlayer(loggedIn: boolean, onError: (message: string) =
     }, SDK_TIMEOUT_MS);
 
     // 브라우저 자동 재생 정책: 첫 사용자 입력 때 SDK 오디오 요소를 활성화
-    const activate = () => { void sdk.current?.activateElement?.(); };
+    const activate = () => { quiet(sdk.current?.activateElement?.()); };
     window.addEventListener('pointerdown', activate, { once: true });
     window.addEventListener('keydown', activate, { once: true });
 
@@ -92,29 +136,56 @@ export function useSpotifyPlayer(loggedIn: boolean, onError: (message: string) =
     };
   }, [loggedIn]);
 
-  const play = useCallback((uri: string) => {
-    const deviceId = device.current;
-    if (!deviceId) return;
-    setS(prev => ({ ...prev, currentUri: uri, isPlaying: true }));
-    playOnDevice(deviceId, uri).catch(e => {
-      setS(prev => ({ ...prev, isPlaying: false }));
-      errorRef.current(`재생하지 못했습니다 (${e instanceof Error ? e.message : String(e)})`);
-    });
+  const clearCue = useCallback(() => {
+    if (!cued.current) return;
+    clearTimeout(cued.current.timer);
+    cued.current = null;
   }, []);
 
-  const toggle = useCallback((uri: string) => {
-    if (currentUri.current === uri) void sdk.current?.togglePlay();
-    else play(uri);
-  }, [play]);
+  const play = useCallback((uri: string) => {
+    clearCue();
+    if (!device.current) return;
+    setS(prev => ({ ...prev, pendingUri: uri, cuedUri: null }));
+    queue().play(uri);
+  }, [queue, clearCue]);
 
-  const pause = useCallback(() => { void sdk.current?.pause(); }, []);
+  const pause = useCallback(() => {
+    clearCue();
+    setS(prev => (prev.pendingUri || prev.cuedUri ? { ...prev, pendingUri: null, cuedUri: null } : prev));
+    queue().stop();
+  }, [queue, clearCue]);
+
+  const cue = useCallback((uri: string) => {
+    // 이미 이 곡을 재생 중이거나 요청 중 (재생 중에 기기가 잠깐 끊겼다 붙은 경우 등)
+    if (queue().wanted === uri || cued.current?.uri === uri) return () => {};
+    // 앞 곡은 바로 멈춘다 — 화면의 곡과 들리는 곡이 어긋나지 않게
+    pause();
+    const timer = setTimeout(() => play(uri), AUTOPLAY_DELAY_MS);
+    cued.current = { uri, timer };
+    setS(prev => ({ ...prev, cuedUri: uri }));
+    return () => {
+      if (cued.current?.timer !== timer) return; // 이미 재생을 요청했거나 다른 곡으로 바뀜
+      clearCue();
+      setS(prev => (prev.cuedUri === uri ? { ...prev, cuedUri: null } : prev));
+    };
+  }, [queue, pause, play, clearCue]);
+
+  const toggle = useCallback((uri: string) => {
+    if (cued.current?.uri === uri) play(uri);
+    else if (queue().busy && queue().wanted === uri) pause();
+    else if (currentUri.current === uri) quiet(sdk.current?.togglePlay());
+    else play(uri);
+  }, [queue, play, pause]);
 
   const status: PlayerStatus = !loggedIn ? 'off' : IS_MOBILE ? 'embed' : s.status;
   const reason = !loggedIn ? null : IS_MOBILE ? '모바일에서는 Spotify 미리듣기 플레이어로 재생합니다' : s.reason;
-  const isPlaying = status === 'ready' && s.isPlaying;
+  const ready = status === 'ready';
+  const isPlaying = ready && s.isPlaying;
+  const pendingUri = ready ? s.pendingUri : null;
+  const cuedUri = ready ? s.cuedUri : null;
 
   return useMemo(
-    () => ({ status, reason, isPlaying, currentUri: s.currentUri, play, toggle, pause }),
-    [status, reason, isPlaying, s.currentUri, play, toggle, pause],
+    () => ({ status, reason, isPlaying, currentUri: s.currentUri, pendingUri, cuedUri, play, toggle, pause, cue }),
+    [status, reason, isPlaying, s.currentUri, pendingUri, cuedUri, play, toggle, pause, cue],
   );
 }

@@ -28,14 +28,14 @@ export default function TierPhase() {
   const done = total - untiered.length;
   const current = untiered[0] ?? null;
 
-  // 곡이 바뀌면 자동 재생. 빠르게 연달아 분류할 때 API를 두드리지 않도록 잠깐 기다린다
-  const { play, pause, status } = player;
+  // 곡이 바뀌면 앞 곡을 멈추고, 그 곡에 잠시(1초) 머물면 자동 재생한다.
+  // 빠르게 넘기는 동안에는 재생 요청을 보내지 않는다 (useSpotifyPlayer의 cue)
+  const { cue, pause, status } = player;
   const uri = current?.uri;
   useEffect(() => {
     if (!uri || status !== 'ready') return;
-    const timer = setTimeout(() => play(uri), 250);
-    return () => clearTimeout(timer);
-  }, [uri, status, play]);
+    return cue(uri);
+  }, [uri, status, cue]);
   useEffect(() => pause, [pause]);
 
   const assign = useCallback((tier: Tier) => {
