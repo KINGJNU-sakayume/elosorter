@@ -1,133 +1,241 @@
 @import "tailwindcss";
 
+/* ── 색상 토큰 (테마별 값) ─────────────────────────────────────────────── */
+
 :root {
-  /* Backgrounds */
+  color-scheme: dark;
+
   --bg-page: #090912;
   --bg-section: #0f0f1a;
   --bg-card: #14141f;
   --bg-sub: #1c1c2c;
 
-  /* Borders */
   --border: #2a2a3e;
   --border-strong: #3a3a54;
 
-  /* Text */
   --text-primary: #f0f0f8;
-  --text-secondary: #8899aa;
-  --text-tertiary: #556070;
+  --text-secondary: #8f9fb0;
+  --text-tertiary: #75808c;
 
-  /* Accent (Spotify green) */
   --accent: #00e87a;
   --accent-soft: rgba(0, 232, 122, 0.12);
   --accent-border: rgba(0, 232, 122, 0.35);
+  --accent-fg: #04130b;
   --spotify-green: #1ed760;
 
-  /* Tier colors */
   --tier-1: #ffd60a;
   --tier-1-soft: rgba(255, 214, 10, 0.12);
   --tier-1-border: rgba(255, 214, 10, 0.35);
   --tier-2: #4cc9f0;
   --tier-2-soft: rgba(76, 201, 240, 0.12);
   --tier-2-border: rgba(76, 201, 240, 0.35);
-  --tier-3: #7c8fa6;
-  --tier-3-soft: rgba(124, 143, 166, 0.1);
-  --tier-3-border: rgba(124, 143, 166, 0.3);
+  --tier-3: #8c9db2;
+  --tier-3-soft: rgba(140, 157, 178, 0.12);
+  --tier-3-border: rgba(140, 157, 178, 0.32);
 
-  /* Status */
   --danger: #ff6b6b;
   --danger-soft: rgba(255, 107, 107, 0.08);
   --danger-border: rgba(255, 107, 107, 0.35);
   --danger-text: #ff9999;
   --warning: #ffa94d;
+  --warning-soft: rgba(255, 169, 77, 0.1);
+  --warning-border: rgba(255, 169, 77, 0.35);
 
-  /* Special compositions */
-  --header-bg: rgba(9, 9, 18, 0.92);
-  --overlay-bg: rgba(0, 0, 0, 0.75);
-  --shadow-card: 0 12px 48px rgba(0, 0, 0, 0.6);
-  --shadow-btn: 0 4px 18px rgba(0, 232, 122, 0.45);
+  --header-bg: rgba(9, 9, 18, 0.88);
+  --shadow-card: 0 12px 48px rgba(0, 0, 0, 0.55);
   --toast-bg: #242436;
   --toast-fg: #f0f0f8;
 
-  /* Rank badge colors (gold/silver/bronze) */
   --rank-1: #ffd60a;
   --rank-2: #b0bec5;
   --rank-3: #ff8a65;
 }
 
 [data-theme="light"] {
-  /* Stone-tinted cream palette */
+  color-scheme: light;
+
   --bg-page: #edeadf;
   --bg-section: #f5f2ea;
   --bg-card: #faf8f1;
-  --bg-sub: #dfdbcc;
+  --bg-sub: #e4e0d2;
 
-  --border: #cdc8b9;
+  --border: #d3cebf;
   --border-strong: #b8b2a0;
 
   --text-primary: #1e1c17;
-  --text-secondary: #55514a;
-  --text-tertiary: #8a8578;
+  --text-secondary: #504c45;
+  --text-tertiary: #6e695e;
 
-  --accent: #1db954;
-  --accent-soft: rgba(29, 185, 84, 0.12);
-  --accent-border: rgba(29, 185, 84, 0.4);
+  --accent: #11783d;
+  --accent-soft: rgba(17, 120, 61, 0.1);
+  --accent-border: rgba(17, 120, 61, 0.4);
+  --accent-fg: #ffffff;
   --spotify-green: #1db954;
 
-  --tier-1: #b8860b;
-  --tier-1-soft: rgba(184, 134, 11, 0.15);
-  --tier-1-border: rgba(184, 134, 11, 0.4);
+  --tier-1: #886406;
+  --tier-1-soft: rgba(136, 100, 6, 0.12);
+  --tier-1-border: rgba(136, 100, 6, 0.4);
   --tier-2: #0e7490;
-  --tier-2-soft: rgba(14, 116, 144, 0.12);
+  --tier-2-soft: rgba(14, 116, 144, 0.11);
   --tier-2-border: rgba(14, 116, 144, 0.4);
-  --tier-3: #5a6b7d;
-  --tier-3-soft: rgba(90, 107, 125, 0.1);
-  --tier-3-border: rgba(90, 107, 125, 0.3);
+  --tier-3: #56687a;
+  --tier-3-soft: rgba(86, 104, 122, 0.1);
+  --tier-3-border: rgba(86, 104, 122, 0.3);
 
   --danger: #c53030;
-  --danger-soft: rgba(197, 48, 48, 0.08);
+  --danger-soft: rgba(197, 48, 48, 0.07);
   --danger-border: rgba(197, 48, 48, 0.35);
-  --danger-text: #c53030;
-  --warning: #d97706;
+  --danger-text: #b42323;
+  --warning: #b45309;
+  --warning-soft: rgba(180, 83, 9, 0.08);
+  --warning-border: rgba(180, 83, 9, 0.35);
 
-  --header-bg: rgba(237, 234, 223, 0.92);
-  --overlay-bg: rgba(30, 28, 23, 0.35);
-  --shadow-card: 0 4px 20px rgba(30, 28, 23, 0.08);
-  --shadow-btn: 0 4px 16px rgba(29, 185, 84, 0.25);
+  --header-bg: rgba(237, 234, 223, 0.9);
+  --shadow-card: 0 6px 24px rgba(30, 28, 23, 0.1);
   --toast-bg: #1e1c17;
   --toast-fg: #faf8f1;
 
-  --rank-1: #b8860b;
-  --rank-2: #94a3b8;
-  --rank-3: #ea580c;
+  --rank-1: #886406;
+  --rank-2: #7d8b9c;
+  --rank-3: #c2410c;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; }
-body {
-  background: var(--bg-page);
-  color: var(--text-primary);
-  font-family: 'DM Sans', sans-serif;
-  min-height: 100vh;
-  overflow-x: hidden;
-  transition: background-color 0.2s ease, color 0.2s ease;
+/* ── Tailwind 테마: 위 변수를 유틸리티 클래스로 노출 (bg-card, text-fg-2 …) ── */
+
+@theme inline {
+  --color-page: var(--bg-page);
+  --color-section: var(--bg-section);
+  --color-card: var(--bg-card);
+  --color-sub: var(--bg-sub);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-fg: var(--text-primary);
+  --color-fg-2: var(--text-secondary);
+  --color-fg-3: var(--text-tertiary);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-border);
+  --color-accent-fg: var(--accent-fg);
+  --color-spotify: var(--spotify-green);
+  --color-t1: var(--tier-1);
+  --color-t1-soft: var(--tier-1-soft);
+  --color-t1-line: var(--tier-1-border);
+  --color-t2: var(--tier-2);
+  --color-t2-soft: var(--tier-2-soft);
+  --color-t2-line: var(--tier-2-border);
+  --color-t3: var(--tier-3);
+  --color-t3-soft: var(--tier-3-soft);
+  --color-t3-line: var(--tier-3-border);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-border);
+  --color-danger-fg: var(--danger-text);
+  --color-warn: var(--warning);
+  --color-warn-soft: var(--warning-soft);
+  --color-warn-line: var(--warning-border);
+  --color-header: var(--header-bg);
+  --color-toast: var(--toast-bg);
+  --color-toast-fg: var(--toast-fg);
+  --color-rank-1: var(--rank-1);
+  --color-rank-2: var(--rank-2);
+  --color-rank-3: var(--rank-3);
+  --shadow-card: var(--shadow-card);
 }
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-section); }
-::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
 
+@theme {
+  --font-sans: "DM Sans", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* 라틴 문자는 Instrument Serif, 한글은 산세리프로 떨어지게 */
+  --font-serif: "Instrument Serif", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", serif;
 
-@keyframes eqPulse { from { height: 3px; opacity: 0.6; } to { height: 14px; opacity: 1; } }
-.eq-bar { width: 3px; border-radius: 2px; background: var(--accent); min-height: 3px; animation: eqPulse 0.7s ease-in-out infinite alternate; }
-.eq-bar:nth-child(1) { animation-duration: 0.65s; }
+  --animate-rise: rise 0.22s ease-out;
+  --animate-pop: pop 0.22s ease-out;
+  --animate-fade: fade 0.35s ease-out;
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+
+/* 곡 제목: 이탤릭 세리프. 이탤릭 글꼴이 없는 한글은 기울이지 않는다 */
+@utility font-title {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-synthesis: none;
+}
+
+/* 긴 목록에서 화면 밖 행의 렌더링을 건너뛴다 (간이 가상 스크롤) */
+@utility content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
+}
+
+/* ── 기본 스타일 ─────────────────────────────────────────────────────── */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    min-height: 100dvh;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    /* 한글은 어절 단위로 줄바꿈하고, 너무 긴 문자열만 강제로 끊는다 */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  dialog {
+    color: inherit;
+  }
+  dialog::backdrop {
+    background: rgba(5, 5, 12, 0.6);
+    backdrop-filter: blur(4px);
+  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 재생 중 이퀄라이저 */
+@keyframes eq-pulse {
+  from { height: 3px; opacity: 0.6; }
+  to { height: 14px; opacity: 1; }
+}
+.eq-bar {
+  width: 3px;
+  min-height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: eq-pulse 0.7s ease-in-out infinite alternate;
+}
 .eq-bar:nth-child(2) { animation-duration: 0.8s; animation-delay: 0.12s; }
 .eq-bar:nth-child(3) { animation-duration: 0.55s; animation-delay: 0.06s; }
 .eq-bar:nth-child(4) { animation-duration: 0.9s; animation-delay: 0.2s; }
-.eq-bar:nth-child(5) { animation-duration: 0.7s; animation-delay: 0.04s; }
-
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@keyframes slideIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
-.animate-in { animation: slideIn 0.2s ease; }
-.animate-fade { animation: fadeIn 0.4s ease; }
-
-@keyframes spin { to { transform: rotate(360deg); } }
-.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }
