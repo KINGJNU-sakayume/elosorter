@@ -5,7 +5,7 @@ export default function EmbedPlayer({ trackId, title }: { trackId: string; title
       title={`${title} 미리듣기`}
       src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`}
       height={80}
-      className="w-full rounded-xl border-0"
+      className="block w-full rounded-xl border-0"
       allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
       loading="lazy"
     />

@@ -2,7 +2,9 @@
 
 export interface SdkPlaybackState {
   paused: boolean;
-  track_window?: { current_track?: { uri?: string } | null };
+  track_window?: {
+    current_track?: { uri?: string; linked_from?: { uri?: string | null } | null } | null;
+  };
 }
 
 export interface SdkPlayer {

@@ -1,14 +1,13 @@
 import { useRef } from 'react';
 import { FileDown, FileUp } from 'lucide-react';
 import Button from '../../components/ui/Button';
-import Card from '../../components/ui/Card';
 import { useConfirm } from '../../components/ui/confirm';
 import { errorMessage, fmtCount } from '../../lib/format';
 import { exportBackup, readBackup } from '../../services/download';
 import { useAppDispatch, useAppState, useToast } from '../../state/context';
 
-/** Supabase 없이도 기기 간 이동·보관이 가능하도록 JSON 백업 */
-export default function BackupCard() {
+/** Supabase 없이도 기기 간 이동·보관이 가능하도록 JSON 백업 (백업 묶음의 한 줄) */
+export default function FileBackup() {
   const { session } = useAppState();
   const dispatch = useAppDispatch();
   const confirm = useConfirm();
@@ -35,14 +34,17 @@ export default function BackupCard() {
   };
 
   return (
-    <Card title="백업 파일">
-      <p className="text-sm text-fg-2">세션 전체(티어·비교 기록)를 JSON 파일로 내려받거나 다시 불러옵니다.</p>
-      <div className="mt-3 flex flex-wrap gap-2">
+    <div className="flex flex-col gap-3 px-4 py-4 @sm:flex-row @sm:items-center sm:px-5">
+      <div className="min-w-0 flex-1">
+        <h3 className="text-[15px] font-semibold">백업 파일</h3>
+        <p className="mt-0.5 text-[13px] text-fg-2">세션 전체(티어·비교 기록)를 JSON 파일로 내려받거나 다시 불러옵니다.</p>
+      </div>
+      <div className="flex gap-2">
         <Button size="sm" icon={FileDown} disabled={!hasSession} onClick={() => exportBackup(session)}>
-          백업 내려받기
+          내려받기
         </Button>
         <Button size="sm" icon={FileUp} onClick={() => input.current?.click()}>
-          백업 불러오기
+          불러오기
         </Button>
         <input
           ref={input}
@@ -56,6 +58,6 @@ export default function BackupCard() {
           }}
         />
       </div>
-    </Card>
+    </div>
   );
 }

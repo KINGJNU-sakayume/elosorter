@@ -8,11 +8,10 @@ const EXPLAIN =
 /** 예상 정확도 (정렬 신뢰도). v1의 "정렬 안정도"(최근 레이팅 변화량)를 대체한다 */
 export default function AccuracyMeter({ value, className = '' }: { value: number | null; className?: string }) {
   const pct = value ?? 0;
-  const tone = value === null ? 'bg-fg-3' : pct >= 0.9 ? 'bg-accent' : pct >= 0.8 ? 'bg-t2' : 'bg-warn';
   return (
-    <div className={`flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-2 ${className}`} title={EXPLAIN}>
-      <span className="flex shrink-0 items-center gap-1 text-xs text-fg-2">
-        예상 정확도 <Info size={12} className="text-fg-3" aria-hidden />
+    <div className={`flex items-center gap-3 ${className}`} title={EXPLAIN}>
+      <span className="flex shrink-0 items-center gap-1 text-[13px] text-fg-2">
+        예상 정확도 <Info size={13} className="text-fg-3" aria-hidden />
       </span>
       <div
         role="meter"
@@ -20,11 +19,11 @@ export default function AccuracyMeter({ value, className = '' }: { value: number
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={value === null ? undefined : Math.round(pct * 1000) / 10}
-        className="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-sub"
+        className="h-1 min-w-12 flex-1 overflow-hidden rounded-full bg-sub"
       >
-        <div className={`h-full rounded-full transition-[width] duration-500 ${tone}`} style={{ width: `${pct * 100}%` }} />
+        <div className="h-full rounded-full bg-fg transition-[width] duration-500" style={{ width: `${pct * 100}%` }} />
       </div>
-      <span className="w-14 shrink-0 text-right font-mono text-sm">{value === null ? '—' : fmtPercent(value)}</span>
+      <span className="w-12 shrink-0 text-right text-[13px] font-semibold tabular-nums">{value === null ? '—' : fmtPercent(value)}</span>
     </div>
   );
 }

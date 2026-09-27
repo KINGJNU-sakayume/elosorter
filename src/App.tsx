@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import Header from './components/Header';
 import SettingsModal from './components/SettingsModal';
+import Sidebar from './components/shell/Sidebar';
+import TabBar from './components/shell/TabBar';
+import TopBar from './components/shell/TopBar';
 import { useLoggedIn } from './hooks/useAuth';
 import { useBackfill } from './hooks/useBackfill';
 import ImportPhase from './phases/import/ImportPhase';
@@ -52,18 +54,24 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // 화면 전체를 쓰는 앱 틀: 넓은 화면은 왼쪽 사이드바, 좁은 화면은 상단 바 + 하단 탭 바.
+  // 문서 자체는 스크롤되지 않고, 각 화면이 필요할 때만 안쪽에서 스크롤한다 (랭킹 목록 등).
   return (
-    <div className="flex min-h-dvh flex-col">
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-card focus:px-3 focus:py-2">
+    <div className="flex h-dvh overflow-hidden">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-card focus:px-3 focus:py-2 focus:shadow-card">
         본문으로 건너뛰기
       </a>
-      <Header onOpenSettings={openSettings} />
-      <main id="main" className="flex min-h-0 flex-1 flex-col">
-        {phase === 'import' && <ImportPhase onOpenSettings={openSettings} />}
-        {phase === 'tier' && <TierPhase />}
-        {phase === 'sort' && <SortPhase />}
-        {phase === 'rank' && <RankPhase />}
-      </main>
+      <Sidebar onOpenSettings={openSettings} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar onOpenSettings={openSettings} />
+        <main id="main" className="relative min-h-0 flex-1 overflow-hidden">
+          {phase === 'import' && <ImportPhase onOpenSettings={openSettings} />}
+          {phase === 'tier' && <TierPhase />}
+          {phase === 'sort' && <SortPhase />}
+          {phase === 'rank' && <RankPhase />}
+        </main>
+        <TabBar />
+      </div>
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

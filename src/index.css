@@ -1,163 +1,165 @@
 @import "tailwindcss";
 
-/* ── 색상 토큰 (테마별 값) ─────────────────────────────────────────────── */
+/* ── 색상 토큰 (테마별 값) ─────────────────────────────────────────────────
+   Apple Music 톤: 흰색/짙은 회색 바탕, 테두리 대신 회색 채움과 얇은 구분선, 키 컬러는 빨강 하나.
+   --accent는 글자·아이콘용, --accent-fill은 흰 글자를 얹는 버튼 바탕용 (다크 모드에서 명도 대비를 맞추려고 나눔) */
 
 :root {
   color-scheme: dark;
 
-  --bg-page: #090912;
-  --bg-section: #0f0f1a;
-  --bg-card: #14141f;
-  --bg-sub: #1c1c2c;
+  --bg-page: #1c1c1e;
+  --bg-sidebar: #232325;
+  --bg-section: #2c2c2e;
+  --bg-card: #2c2c2e;
+  --bg-sub: rgba(118, 118, 128, 0.24);
+  --bg-sub-strong: rgba(118, 118, 128, 0.3);
+  --bg-row-alt: rgba(255, 255, 255, 0.035);
+  --bg-row-hover: rgba(255, 255, 255, 0.07);
+  --thumb: #636366;
 
-  --border: #2a2a3e;
-  --border-strong: #3a3a54;
+  --border: rgba(255, 255, 255, 0.09);
 
-  --text-primary: #f0f0f8;
-  --text-secondary: #8f9fb0;
-  --text-tertiary: #75808c;
+  --text-primary: #f5f5f7;
+  --text-secondary: #b0b0b5;
+  --text-tertiary: #8d8d93;
 
-  --accent: #00e87a;
-  --accent-soft: rgba(0, 232, 122, 0.12);
-  --accent-border: rgba(0, 232, 122, 0.35);
-  --accent-fg: #04130b;
+  --accent: #ff6b78;
+  --accent-fill: #e0223c;
+  --accent-soft: rgba(255, 107, 120, 0.14);
+  --accent-border: rgba(255, 107, 120, 0.45);
+  --accent-fg: #ffffff;
   --spotify-green: #1ed760;
 
-  --tier-1: #ffd60a;
-  --tier-1-soft: rgba(255, 214, 10, 0.12);
-  --tier-1-border: rgba(255, 214, 10, 0.35);
-  --tier-2: #4cc9f0;
-  --tier-2-soft: rgba(76, 201, 240, 0.12);
-  --tier-2-border: rgba(76, 201, 240, 0.35);
-  --tier-3: #8c9db2;
-  --tier-3-soft: rgba(140, 157, 178, 0.12);
-  --tier-3-border: rgba(140, 157, 178, 0.32);
+  --tier-1: #ff8a95;
+  --tier-1-soft: rgba(255, 107, 120, 0.12);
+  --tier-1-fill: #e0223c;
+  --tier-2: #adabff;
+  --tier-2-soft: rgba(142, 140, 255, 0.13);
+  --tier-2-fill: #5e5ce6;
+  --tier-3: #c0c0c5;
+  --tier-3-soft: rgba(161, 161, 166, 0.13);
+  --tier-3-fill: #636366;
 
-  --danger: #ff6b6b;
-  --danger-soft: rgba(255, 107, 107, 0.08);
-  --danger-border: rgba(255, 107, 107, 0.35);
-  --danger-text: #ff9999;
-  --warning: #ffa94d;
-  --warning-soft: rgba(255, 169, 77, 0.1);
-  --warning-border: rgba(255, 169, 77, 0.35);
+  --danger: #ff8a82;
+  --danger-soft: rgba(255, 105, 97, 0.12);
+  --warning: #ffb340;
+  --warning-soft: rgba(255, 179, 64, 0.12);
 
-  --header-bg: rgba(9, 9, 18, 0.88);
-  --shadow-card: 0 12px 48px rgba(0, 0, 0, 0.55);
-  --toast-bg: #242436;
-  --toast-fg: #f0f0f8;
-
-  --rank-1: #ffd60a;
-  --rank-2: #b0bec5;
-  --rank-3: #ff8a65;
+  --bar-bg: rgba(28, 28, 30, 0.78);
+  --shadow-card: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --shadow-art: 0 22px 48px -14px rgba(0, 0, 0, 0.75), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-thumb: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --toast-bg: rgba(44, 44, 46, 0.94);
+  --toast-fg: #f5f5f7;
 }
 
 [data-theme="light"] {
   color-scheme: light;
 
-  --bg-page: #edeadf;
-  --bg-section: #f5f2ea;
-  --bg-card: #faf8f1;
-  --bg-sub: #e4e0d2;
+  --bg-page: #ffffff;
+  --bg-sidebar: #f5f5f7;
+  --bg-section: #f5f5f7;
+  --bg-card: #ffffff;
+  --bg-sub: rgba(118, 118, 128, 0.12);
+  --bg-sub-strong: rgba(118, 118, 128, 0.2);
+  --bg-row-alt: rgba(0, 0, 0, 0.028);
+  --bg-row-hover: rgba(0, 0, 0, 0.055);
+  --thumb: #ffffff;
 
-  --border: #d3cebf;
-  --border-strong: #b8b2a0;
+  --border: rgba(60, 60, 67, 0.13);
 
-  --text-primary: #1e1c17;
-  --text-secondary: #504c45;
-  --text-tertiary: #6e695e;
+  --text-primary: #1d1d1f;
+  --text-secondary: #5e5e63;
+  --text-tertiary: #737378;
 
-  --accent: #11783d;
-  --accent-soft: rgba(17, 120, 61, 0.1);
-  --accent-border: rgba(17, 120, 61, 0.4);
+  --accent: #cc1331;
+  --accent-fill: #e0223c;
+  --accent-soft: rgba(224, 34, 60, 0.09);
+  --accent-border: rgba(224, 34, 60, 0.4);
   --accent-fg: #ffffff;
   --spotify-green: #1db954;
 
-  --tier-1: #886406;
-  --tier-1-soft: rgba(136, 100, 6, 0.12);
-  --tier-1-border: rgba(136, 100, 6, 0.4);
-  --tier-2: #0e7490;
-  --tier-2-soft: rgba(14, 116, 144, 0.11);
-  --tier-2-border: rgba(14, 116, 144, 0.4);
-  --tier-3: #56687a;
-  --tier-3-soft: rgba(86, 104, 122, 0.1);
-  --tier-3-border: rgba(86, 104, 122, 0.3);
+  --tier-1: #b80d29;
+  --tier-1-soft: rgba(224, 34, 60, 0.09);
+  --tier-1-fill: #e0223c;
+  --tier-2: #4a48c4;
+  --tier-2-soft: rgba(88, 86, 214, 0.1);
+  --tier-2-fill: #5856d6;
+  --tier-3: #56565b;
+  --tier-3-soft: rgba(110, 110, 115, 0.12);
+  --tier-3-fill: #6e6e73;
 
-  --danger: #c53030;
-  --danger-soft: rgba(197, 48, 48, 0.07);
-  --danger-border: rgba(197, 48, 48, 0.35);
-  --danger-text: #b42323;
-  --warning: #b45309;
-  --warning-soft: rgba(180, 83, 9, 0.08);
-  --warning-border: rgba(180, 83, 9, 0.35);
+  --danger: #c4001a;
+  --danger-soft: rgba(215, 0, 21, 0.06);
+  --warning: #c93400;
+  --warning-soft: rgba(255, 149, 0, 0.1);
 
-  --header-bg: rgba(237, 234, 223, 0.9);
-  --shadow-card: 0 6px 24px rgba(30, 28, 23, 0.1);
-  --toast-bg: #1e1c17;
-  --toast-fg: #faf8f1;
-
-  --rank-1: #886406;
-  --rank-2: #7d8b9c;
-  --rank-3: #c2410c;
+  --bar-bg: rgba(255, 255, 255, 0.8);
+  --shadow-card: 0 12px 40px rgba(0, 0, 0, 0.14);
+  --shadow-art: 0 20px 40px -16px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.08);
+  --shadow-thumb: 0 1px 3px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  --toast-bg: rgba(44, 44, 46, 0.94);
+  --toast-fg: #f5f5f7;
 }
 
-/* ── Tailwind 테마: 위 변수를 유틸리티 클래스로 노출 (bg-card, text-fg-2 …) ── */
+/* ── Tailwind 테마: 위 변수를 유틸리티 클래스로 노출 (bg-section, text-fg-2 …) ── */
 
 @theme inline {
   --color-page: var(--bg-page);
+  --color-sidebar: var(--bg-sidebar);
   --color-section: var(--bg-section);
   --color-card: var(--bg-card);
   --color-sub: var(--bg-sub);
+  --color-sub-strong: var(--bg-sub-strong);
+  --color-row-alt: var(--bg-row-alt);
+  --color-row-hover: var(--bg-row-hover);
+  --color-thumb: var(--thumb);
   --color-line: var(--border);
-  --color-line-strong: var(--border-strong);
   --color-fg: var(--text-primary);
   --color-fg-2: var(--text-secondary);
   --color-fg-3: var(--text-tertiary);
   --color-accent: var(--accent);
+  --color-accent-fill: var(--accent-fill);
   --color-accent-soft: var(--accent-soft);
   --color-accent-line: var(--accent-border);
   --color-accent-fg: var(--accent-fg);
   --color-spotify: var(--spotify-green);
   --color-t1: var(--tier-1);
   --color-t1-soft: var(--tier-1-soft);
-  --color-t1-line: var(--tier-1-border);
+  --color-t1-fill: var(--tier-1-fill);
   --color-t2: var(--tier-2);
   --color-t2-soft: var(--tier-2-soft);
-  --color-t2-line: var(--tier-2-border);
+  --color-t2-fill: var(--tier-2-fill);
   --color-t3: var(--tier-3);
   --color-t3-soft: var(--tier-3-soft);
-  --color-t3-line: var(--tier-3-border);
+  --color-t3-fill: var(--tier-3-fill);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
-  --color-danger-line: var(--danger-border);
-  --color-danger-fg: var(--danger-text);
   --color-warn: var(--warning);
   --color-warn-soft: var(--warning-soft);
-  --color-warn-line: var(--warning-border);
-  --color-header: var(--header-bg);
+  --color-bar: var(--bar-bg);
   --color-toast: var(--toast-bg);
   --color-toast-fg: var(--toast-fg);
-  --color-rank-1: var(--rank-1);
-  --color-rank-2: var(--rank-2);
-  --color-rank-3: var(--rank-3);
   --shadow-card: var(--shadow-card);
+  --shadow-art: var(--shadow-art);
+  --shadow-thumb: var(--shadow-thumb);
 }
 
 @theme {
-  --font-sans: "DM Sans", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
-  --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  /* 라틴 문자는 Instrument Serif, 한글은 산세리프로 떨어지게 */
-  --font-serif: "Instrument Serif", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", serif;
+  /* 애플 기기: SF Pro + Apple SD Gothic Neo. 그 밖: Pretendard (index.html에서 불러옴) */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard Variable", Pretendard, "Segoe UI", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
-  --animate-rise: rise 0.22s ease-out;
-  --animate-pop: pop 0.22s ease-out;
-  --animate-fade: fade 0.35s ease-out;
+  --animate-rise: rise 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-pop: pop 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-fade: fade 0.3s ease-out;
 
   @keyframes rise {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: none; }
   }
   @keyframes pop {
-    from { opacity: 0; transform: scale(0.97); }
+    from { opacity: 0; transform: scale(0.96); }
     to { opacity: 1; transform: none; }
   }
   @keyframes fade {
@@ -166,17 +168,18 @@
   }
 }
 
-/* 곡 제목: 이탤릭 세리프. 이탤릭 글꼴이 없는 한글은 기울이지 않는다 */
-@utility font-title {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-synthesis: none;
-}
+/* 세로 공간이 넉넉한 화면에서만 보여 줄 부가 정보 (스크롤 없이 한 화면에 맞추려고) */
+@custom-variant tall (@media (min-height: 800px));
 
 /* 긴 목록에서 화면 밖 행의 렌더링을 건너뛴다 (간이 가상 스크롤) */
 @utility content-auto {
   content-visibility: auto;
-  contain-intrinsic-size: auto 64px;
+  contain-intrinsic-size: auto 56px;
+}
+
+/* 앨범 아트 영역: 남는 공간(가로·세로 중 작은 쪽)에 맞춰 정사각형 크기를 정한다 */
+@utility fit-box {
+  container-type: size;
 }
 
 /* ── 기본 스타일 ─────────────────────────────────────────────────────── */
@@ -184,17 +187,20 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
-    min-height: 100dvh;
     background: var(--bg-page);
     color: var(--text-primary);
     font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.45;
+    letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     /* 한글은 어절 단위로 줄바꿈하고, 너무 긴 문자열만 강제로 끊는다 */
     word-break: keep-all;
     overflow-wrap: anywhere;
-    transition: background-color 0.2s ease, color 0.2s ease;
   }
   :focus-visible {
     outline: 2px solid var(--accent);
@@ -208,12 +214,20 @@
     color: inherit;
   }
   dialog::backdrop {
-    background: rgba(5, 5, 12, 0.6);
-    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(6px);
   }
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::selection {
+    background: var(--accent-soft);
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--bg-sub-strong);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -226,14 +240,14 @@
 
 /* 재생 중 이퀄라이저 */
 @keyframes eq-pulse {
-  from { height: 3px; opacity: 0.6; }
-  to { height: 14px; opacity: 1; }
+  from { height: 3px; }
+  to { height: 12px; }
 }
 .eq-bar {
-  width: 3px;
+  width: 2.5px;
   min-height: 3px;
-  border-radius: 2px;
-  background: var(--accent);
+  border-radius: 1px;
+  background: currentColor;
   animation: eq-pulse 0.7s ease-in-out infinite alternate;
 }
 .eq-bar:nth-child(2) { animation-duration: 0.8s; animation-delay: 0.12s; }

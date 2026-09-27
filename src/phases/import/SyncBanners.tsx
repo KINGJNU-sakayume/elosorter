@@ -1,4 +1,4 @@
-import { Minus, Plus } from 'lucide-react';
+import { CircleMinus, CirclePlus } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import { useAppDispatch, useAppState } from '../../state/context';
 
@@ -6,6 +6,8 @@ function preview(names: string[]): string {
   const head = names.slice(0, 3).join(' / ');
   return names.length > 3 ? `${head} 외 ${names.length - 3}곡` : head;
 }
+
+const banner = 'flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center';
 
 export default function SyncBanners() {
   const { session, pendingNew, pendingRemovedIds } = useAppState();
@@ -17,8 +19,8 @@ export default function SyncBanners() {
   return (
     <div className="space-y-3">
       {pendingNew.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-accent-line bg-accent-soft p-4 sm:flex-row sm:items-center">
-          <Plus className="hidden shrink-0 text-accent sm:block" aria-hidden />
+        <div className={`${banner} bg-accent-soft`}>
+          <CirclePlus className="hidden shrink-0 text-accent sm:block" aria-hidden />
           <div className="min-w-0 flex-1 text-sm">
             <strong>새 곡 {pendingNew.length}곡</strong>이 Spotify에 추가됐습니다
             <p className="mt-0.5 truncate text-xs text-fg-2">{preview(pendingNew.map(t => `${t.name} — ${t.artists[0] ?? ''}`))}</p>
@@ -39,8 +41,8 @@ export default function SyncBanners() {
         </div>
       )}
       {pendingRemovedIds.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-danger-line bg-danger-soft p-4 sm:flex-row sm:items-center">
-          <Minus className="hidden shrink-0 text-danger sm:block" aria-hidden />
+        <div className={`${banner} bg-danger-soft`}>
+          <CircleMinus className="hidden shrink-0 text-danger sm:block" aria-hidden />
           <div className="min-w-0 flex-1 text-sm">
             <strong>{pendingRemovedIds.length}곡</strong>이 Spotify에서 빠졌습니다
             <p className="mt-0.5 truncate text-xs text-fg-2">{preview(removedNames)}</p>

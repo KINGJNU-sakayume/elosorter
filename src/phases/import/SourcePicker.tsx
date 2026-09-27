@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
-import { Heart, ListMusic, Search } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Check, Heart } from 'lucide-react';
 import type { Source } from '../../core/types';
 import Button from '../../components/ui/Button';
-import Card from '../../components/ui/Card';
 import Cover from '../../components/ui/Cover';
+import SearchField from '../../components/ui/SearchField';
 import { useConfirm } from '../../components/ui/confirm';
 import { errorMessage, fmtCount } from '../../lib/format';
 import { fetchPlaylists, fetchSourceTracks } from '../../services/spotify/api';
@@ -12,38 +12,42 @@ import { useAppDispatch, useAppState, useToast } from '../../state/context';
 import { sourceLabel } from './sourceLabel';
 import { useSync } from './useSync';
 
-type Tab = 'liked' | 'playlist';
+interface Choice {
+  source: Source;
+  name: string | null;
+  trackCount: number | null;
+}
 
+const LIKED: Choice = { source: 'liked', name: null, trackCount: null };
+
+/**
+ * 음악 고르기: 좋아요 곡 + 내 플레이리스트를 앨범 아트 격자로 (Apple Music 보관함처럼).
+ * 고른 뒤 아래 막대의 버튼으로 불러온다. 목록이 길면 이 영역 안에서만 스크롤한다.
+ */
 export default function SourcePicker() {
   const { session } = useAppState();
   const dispatch = useAppDispatch();
   const toast = useToast();
   const confirm = useConfirm();
   const { sync, syncing } = useSync();
+  const hasSession = session.tracks.length > 0;
 
-  const [tab, setTab] = useState<Tab>('liked');
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[] | null>(null);
-  const [playlistsLoading, setPlaylistsLoading] = useState(false);
-  const [selected, setSelected] = useState<SpotifyPlaylist | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Choice | null>(hasSession ? null : LIKED);
   const [query, setQuery] = useState('');
   const [progress, setProgress] = useState<{ loaded: number; total: number } | null>(null);
 
-  const hasSession = session.tracks.length > 0;
+  useEffect(() => {
+    let cancelled = false;
+    fetchPlaylists().then(
+      list => { if (!cancelled) setPlaylists(list); },
+      e => { if (!cancelled) setListError(errorMessage(e)); },
+    );
+    return () => { cancelled = true; };
+  }, []);
 
-  const openPlaylists = async () => {
-    setTab('playlist');
-    if (playlists || playlistsLoading) return;
-    setPlaylistsLoading(true);
-    try {
-      setPlaylists(await fetchPlaylists());
-    } catch (e) {
-      toast(`플레이리스트를 불러오지 못했습니다: ${errorMessage(e)}`, 'error');
-    } finally {
-      setPlaylistsLoading(false);
-    }
-  };
-
-  const load = async (source: Source, name: string | null) => {
+  const load = async ({ source, name }: Choice) => {
     // 같은 소스를 다시 불러오면 기록을 지우지 않고 동기화로 처리 (v1은 비교 기록이 통째로 사라졌다)
     if (hasSession && session.source === source) {
       await sync();
@@ -52,7 +56,7 @@ export default function SourcePicker() {
     if (hasSession) {
       const ok = await confirm({
         title: '새 세션을 시작할까요?',
-        message: `현재 세션(${sourceLabel(session)} · ${fmtCount(session.tracks.length)}곡 · 비교 ${fmtCount(session.compCount)}회)은 이 브라우저에서 지워집니다. 필요하면 먼저 아래에서 백업 파일을 내려받으세요.`,
+        message: `현재 세션(${sourceLabel(session)} · ${fmtCount(session.tracks.length)}곡 · 비교 ${fmtCount(session.compCount)}회)은 이 브라우저에서 지워집니다. 필요하면 먼저 백업 파일을 내려받으세요.`,
         confirmLabel: '새로 시작',
         tone: 'danger',
       });
@@ -80,94 +84,97 @@ export default function SourcePicker() {
   }, [playlists, query]);
 
   const loading = progress !== null || syncing;
-  const progressLabel = progress && progress.total
-    ? `불러오는 중… ${fmtCount(progress.loaded)} / ${fmtCount(progress.total)}`
-    : '불러오는 중…';
+  const isCurrent = (source: Source) => hasSession && session.source === source;
+  const actionLabel = loading
+    ? progress?.total ? `불러오는 중… ${fmtCount(progress.loaded)} / ${fmtCount(progress.total)}` : '불러오는 중…'
+    : selected && isCurrent(selected.source) ? '동기화' : '불러오기';
 
-  const tabCls = (active: boolean) =>
-    `flex h-9 items-center gap-2 rounded-lg border px-3.5 text-sm font-semibold transition-colors ${
-      active ? 'border-accent bg-accent-soft text-accent' : 'border-line text-fg-2 hover:bg-sub'
-    }`;
+  const tile = (choice: Choice, art: ReactNode, title: string, subtitle: string) => {
+    const active = selected?.source === choice.source;
+    return (
+      <li key={choice.source}>
+        <button
+          type="button"
+          aria-pressed={active}
+          onClick={() => setSelected(choice)}
+          onDoubleClick={() => { if (!loading) void load(choice); }}
+          className="group block w-full rounded-lg text-left"
+        >
+          <span className={`relative block aspect-square overflow-hidden rounded-lg shadow-thumb transition-[box-shadow] ${
+            active ? 'ring-[3px] ring-accent ring-offset-2 ring-offset-section' : ''
+          }`}>
+            {art}
+            {isCurrent(choice.source) && (
+              <span className="absolute top-1.5 left-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur-md">
+                현재 세션
+              </span>
+            )}
+            {active && (
+              <span className="absolute right-1.5 bottom-1.5 flex size-6 items-center justify-center rounded-full bg-accent-fill text-white shadow-thumb">
+                <Check size={14} strokeWidth={3} aria-hidden />
+              </span>
+            )}
+          </span>
+          <span className="mt-2 block truncate text-[13px] font-medium">{title}</span>
+          <span className="block truncate text-xs text-fg-2">{subtitle}</span>
+        </button>
+      </li>
+    );
+  };
 
   return (
-    <Card title={hasSession ? '다른 음악으로 새 세션' : '음악 불러오기'}>
-      <div role="tablist" aria-label="음악 소스" className="mb-4 flex gap-2">
-        <button type="button" role="tab" aria-selected={tab === 'liked'} className={tabCls(tab === 'liked')} onClick={() => setTab('liked')}>
-          <Heart size={15} aria-hidden /> 좋아요 곡
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'playlist'} className={tabCls(tab === 'playlist')} onClick={openPlaylists}>
-          <ListMusic size={15} aria-hidden /> 플레이리스트
-        </button>
+    <section className="flex min-h-[26rem] flex-col rounded-2xl bg-section md:h-full md:min-h-0" aria-labelledby="source-title">
+      <div className="flex flex-wrap items-center gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
+        <h2 id="source-title" className="mr-auto text-[17px] font-semibold">
+          {hasSession ? '다른 음악으로 새 세션' : '불러올 음악 고르기'}
+        </h2>
+        {playlists && playlists.length > 8 && (
+          <SearchField value={query} onChange={setQuery} label="플레이리스트 검색" placeholder="플레이리스트 검색" className="w-full sm:w-56" />
+        )}
       </div>
 
-      {tab === 'liked' ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="font-semibold">좋아요 표시한 곡</div>
-            <div className="mt-0.5 text-sm text-fg-2">
-              {session.source === 'liked' ? '지금 세션의 소스입니다 — 다시 불러오면 기록을 유지한 채 동기화합니다' : 'Spotify 라이브러리 전체를 불러옵니다'}
-            </div>
-          </div>
-          <Button variant="primary" loading={loading} onClick={() => load('liked', null)}>
-            {loading ? progressLabel : session.source === 'liked' ? '동기화' : '불러오기'}
-          </Button>
-        </div>
-      ) : (
-        <div>
-          {playlists && playlists.length > 8 && (
-            <label className="relative mb-3 block">
-              <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" aria-hidden />
-              <span className="sr-only">플레이리스트 검색</span>
-              <input
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="플레이리스트 검색"
-                className="h-10 w-full rounded-lg border border-line bg-sub pr-3 pl-9 text-sm placeholder:text-fg-3 focus:border-accent focus:outline-none"
-              />
-            </label>
-          )}
-          {playlistsLoading && <p className="py-6 text-center text-sm text-fg-2">플레이리스트 목록을 불러오는 중…</p>}
-          {playlists && !filtered.length && (
-            <p className="py-6 text-center text-sm text-fg-2">{query ? '검색 결과가 없습니다' : '플레이리스트가 없습니다'}</p>
-          )}
-          <ul className="max-h-80 space-y-1.5 overflow-y-auto pr-1" aria-label="플레이리스트">
-            {filtered.map(p => {
-              const active = selected?.id === p.id;
-              const current = session.source === `playlist:${p.id}`;
-              return (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setSelected(p)}
-                    className={`flex w-full items-center gap-3 rounded-xl border p-2 text-left transition-colors ${
-                      active ? 'border-accent bg-accent-soft' : 'border-transparent hover:bg-sub'
-                    }`}
-                  >
-                    <Cover src={p.imageUrl} lazy className="size-11 shrink-0 rounded-md" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold">{p.name}</div>
-                      <div className="truncate text-xs text-fg-2">
-                        {fmtCount(p.trackCount)}곡{p.owner && ` · ${p.owner}`}{current && ' · 현재 세션'}
-                      </div>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="mt-3 flex justify-end">
-            <Button
-              variant="primary"
-              loading={loading}
-              disabled={!selected}
-              onClick={() => selected && load(`playlist:${selected.id}`, selected.name)}
-            >
-              {loading ? progressLabel : selected && session.source === `playlist:${selected.id}` ? '동기화' : '선택한 플레이리스트 불러오기'}
-            </Button>
-          </div>
-        </div>
-      )}
-    </Card>
+      <ul
+        aria-label="음악 소스"
+        className="grid min-h-0 flex-1 auto-rows-max grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-x-4 gap-y-5 overflow-y-auto px-4 py-4 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] sm:px-5"
+      >
+        {!query && tile(
+          LIKED,
+          <span className="flex h-full w-full items-center justify-center bg-linear-to-br from-[#ff7a8e] to-[#e0223c]">
+            <Heart className="size-2/5 text-white" fill="currentColor" strokeWidth={0} aria-hidden />
+          </span>,
+          '좋아요 표시한 곡',
+          'Spotify 라이브러리',
+        )}
+        {filtered.map(p => tile(
+          { source: `playlist:${p.id}`, name: p.name, trackCount: p.trackCount },
+          <Cover src={p.imageUrl} lazy className="h-full w-full" />,
+          p.name,
+          `${fmtCount(p.trackCount)}곡${p.owner ? ` · ${p.owner}` : ''}`,
+        ))}
+        {!playlists && !listError && Array.from({ length: 5 }, (_, i) => (
+          <li key={`skeleton-${i}`} aria-hidden>
+            <span className="block aspect-square animate-pulse rounded-lg bg-sub" />
+            <span className="mt-2 block h-3 w-3/4 animate-pulse rounded bg-sub" />
+          </li>
+        ))}
+      </ul>
+      {listError && <p className="px-5 pb-3 text-sm text-danger">플레이리스트를 불러오지 못했습니다: {listError}</p>}
+      {playlists && query && !filtered.length && <p className="px-5 pb-3 text-sm text-fg-2">검색 결과가 없습니다</p>}
+
+      <div className="flex items-center gap-3 border-t border-line px-4 py-3 sm:px-5">
+        <p className="min-w-0 flex-1 truncate text-sm text-fg-2">
+          {selected
+            ? <>
+                <span className="font-semibold text-fg">{selected.name ?? '좋아요 표시한 곡'}</span>
+                {selected.trackCount !== null && ` · ${fmtCount(selected.trackCount)}곡`}
+                {isCurrent(selected.source) && ' · 지금 세션 — 기록을 유지한 채 동기화합니다'}
+              </>
+            : '불러올 음악을 고르세요'}
+        </p>
+        <Button variant="primary" loading={loading} disabled={!selected} onClick={() => selected && load(selected)}>
+          {actionLabel}
+        </Button>
+      </div>
+    </section>
   );
 }
