@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { CircleAlert, CircleCheck } from 'lucide-react';
 import type { ToastTone } from '../state/context';
 
 export interface ToastMessage {
@@ -6,12 +7,6 @@ export interface ToastMessage {
   message: string;
   tone: ToastTone;
 }
-
-const TONE: Record<ToastTone, string> = {
-  info: 'border-line-strong',
-  success: 'border-accent-line',
-  error: 'border-danger-line',
-};
 
 export default function Toast({ toast, onDone }: { toast: ToastMessage | null; onDone: () => void }) {
   useEffect(() => {
@@ -24,14 +19,16 @@ export default function Toast({ toast, onDone }: { toast: ToastMessage | null; o
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-50 flex justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 flex justify-center px-4 lg:bottom-8"
     >
       {toast && (
         <div
           key={toast.id}
-          className={`animate-rise max-w-md rounded-xl border bg-toast px-4 py-2.5 text-center text-sm text-toast-fg shadow-lg ${TONE[toast.tone]}`}
+          className="flex max-w-md animate-rise items-center gap-2 rounded-2xl bg-toast px-4 py-2.5 text-sm font-medium text-toast-fg shadow-card backdrop-blur-xl"
         >
-          {toast.message}
+          {toast.tone === 'success' && <CircleCheck size={17} className="shrink-0 text-[#32d74b]" aria-hidden />}
+          {toast.tone === 'error' && <CircleAlert size={17} className="shrink-0 text-[#ff6961]" aria-hidden />}
+          <span>{toast.message}</span>
         </div>
       )}
     </div>

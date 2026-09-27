@@ -19,9 +19,9 @@ export default function SettingsModal({ open, onClose, onSaved }: Props) {
 }
 
 const inputCls =
-  'w-full rounded-lg border border-line-strong bg-sub px-3.5 py-2.5 font-mono text-sm text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none';
-const labelCls = 'mb-1.5 block font-mono text-xs text-fg-2';
-const helpCls = 'mt-1.5 text-xs leading-relaxed text-fg-3';
+  'h-10 w-full rounded-[10px] bg-sub px-3 text-sm text-fg placeholder:text-fg-2 focus:ring-2 focus:ring-accent-line focus:outline-none';
+const labelCls = 'mb-1.5 block text-[13px] font-semibold';
+const helpCls = 'mt-1.5 text-xs leading-relaxed text-fg-2';
 
 function validate(url: string, key: string): string | null {
   if (url && !key) return 'Supabase URL을 입력했다면 anon key도 함께 입력하세요';
@@ -60,37 +60,37 @@ function SettingsForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: ()
 
   return (
     <form onSubmit={submit} noValidate>
-      <h2 id="settings-title" className="text-lg font-bold">설정</h2>
-      <p className="mt-1 mb-5 text-sm leading-relaxed text-fg-2">
+      <h2 id="settings-title" className="text-xl font-bold tracking-tight">설정</h2>
+      <p className="mt-1 mb-5 text-[13px] leading-relaxed text-fg-2">
         보통은 배포 시 환경변수로 들어갑니다. 여기서 입력한 값은 이 브라우저에만 저장되어 환경변수보다 우선합니다.
       </p>
 
       <div className="space-y-4">
         <div>
-          <label htmlFor="cfg-client" className={labelCls}>SPOTIFY_CLIENT_ID</label>
+          <label htmlFor="cfg-client" className={labelCls}>Spotify Client ID</label>
           <input id="cfg-client" className={inputCls} value={clientId} onChange={e => setClientId(e.target.value)}
             placeholder="32자리 Client ID" autoComplete="off" spellCheck={false} />
           <p className={helpCls}>
             <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">
               developer.spotify.com
             </a>
-            에서 앱을 만든 뒤 Redirect URI에 <code className="break-all text-fg-2">{initial.redirectUri}</code> 를 추가하세요.
+            에서 앱을 만든 뒤 Redirect URI에 <code className="font-mono break-all text-fg">{initial.redirectUri}</code> 를 추가하세요.
           </p>
         </div>
 
         <div>
-          <label htmlFor="cfg-url" className={labelCls}>SUPABASE_URL <span className="text-fg-3">(선택)</span></label>
+          <label htmlFor="cfg-url" className={labelCls}>Supabase URL <span className="font-normal text-fg-2">(선택)</span></label>
           <input id="cfg-url" className={inputCls} value={supabaseUrl} onChange={e => setSupabaseUrl(e.target.value)}
             placeholder="https://xxxx.supabase.co" autoComplete="off" spellCheck={false} inputMode="url" />
         </div>
 
         <div>
-          <label htmlFor="cfg-key" className={labelCls}>SUPABASE_ANON_KEY <span className="text-fg-3">(선택)</span></label>
+          <label htmlFor="cfg-key" className={labelCls}>Supabase anon key <span className="font-normal text-fg-2">(선택)</span></label>
           <div className="relative">
             <input id="cfg-key" type={showKey ? 'text' : 'password'} className={`${inputCls} pr-11`} value={anonKey}
               onChange={e => setAnonKey(e.target.value)} placeholder="eyJhbGciOi…" autoComplete="off" spellCheck={false} />
             <button type="button" onClick={() => setShowKey(v => !v)} aria-label={showKey ? 'anon key 숨기기' : 'anon key 보기'}
-              className="absolute top-1/2 right-2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-fg-3 hover:text-fg">
+              className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-fg-2 hover:text-fg">
               {showKey ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
             </button>
           </div>
@@ -99,7 +99,7 @@ function SettingsForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: ()
       </div>
 
       {error && (
-        <p role="alert" className="mt-4 rounded-lg border border-danger-line bg-danger-soft px-3.5 py-2.5 text-sm text-danger-fg">
+        <p role="alert" className="mt-4 rounded-[10px] bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
           {error}
         </p>
       )}

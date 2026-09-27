@@ -7,7 +7,7 @@ interface ProgressBarProps {
   className?: string;
 }
 
-export default function ProgressBar({ value, label, barClass = 'bg-accent', className = '' }: ProgressBarProps) {
+export default function ProgressBar({ value, label, barClass = 'bg-accent-fill', className = '' }: ProgressBarProps) {
   const pct = Math.round(Math.min(1, Math.max(0, value)) * 1000) / 10;
   return (
     <div
@@ -16,7 +16,7 @@ export default function ProgressBar({ value, label, barClass = 'bg-accent', clas
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={pct}
-      className={`h-1.5 overflow-hidden rounded-full bg-sub ${className}`}
+      className={`h-1 overflow-hidden rounded-full bg-sub ${className}`}
     >
       <div className={`h-full rounded-full transition-[width] duration-500 ${barClass}`} style={{ width: `${pct}%` }} />
     </div>

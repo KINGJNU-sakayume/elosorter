@@ -21,14 +21,14 @@ export default function ConfirmProvider({ children }: { children: ReactNode }) {
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
-      <Modal open={!!request} onClose={() => close(false)} labelledBy="confirm-title">
+      <Modal open={!!request} onClose={() => close(false)} labelledBy="confirm-title" size="sm">
         {request && (
-          <>
-            <h2 id="confirm-title" className="text-lg font-bold">{request.title}</h2>
+          <div className="text-center">
+            <h2 id="confirm-title" className="text-[17px] leading-snug font-semibold">{request.title}</h2>
             {request.message && (
-              <div className="mt-2 text-sm leading-relaxed text-fg-2">{request.message}</div>
+              <div className="mt-2 text-[13px] leading-relaxed text-fg-2">{request.message}</div>
             )}
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-5 grid grid-cols-2 gap-2">
               <Button onClick={() => close(false)}>{request.cancelLabel ?? '취소'}</Button>
               <Button
                 variant={request.tone === 'danger' ? 'danger' : 'primary'}
@@ -38,7 +38,7 @@ export default function ConfirmProvider({ children }: { children: ReactNode }) {
                 {request.confirmLabel ?? '확인'}
               </Button>
             </div>
-          </>
+          </div>
         )}
       </Modal>
     </ConfirmContext.Provider>

@@ -7,7 +7,7 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'light' ? '#edeadf' : '#090912');
+      ?.setAttribute('content', theme === 'light' ? '#ffffff' : '#1c1c1e');
     try { localStorage.setItem('theme', theme); } catch { /* 무시 */ }
   }, [theme]);
 

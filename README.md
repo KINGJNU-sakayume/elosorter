@@ -9,7 +9,7 @@ Spotify 좋아요 곡·플레이리스트를 **티어 분류 → 1:1 비교**로
 
 1. **Spotify 로그인** (PKCE OAuth)
 2. **불러오기** — 좋아요 곡 또는 플레이리스트. 이미 진행 중인 소스를 다시 불러오면 기록을 지우지 않고 동기화합니다.
-3. **티어 분류** — 곡마다 직감으로 Tier 1(최애)·2(선호)·3(보통). 권장 비율(10/40/50)은 가이드일 뿐이며, 실제로 나눈 비율에 맞춰 시작 점수가 자동으로 조정됩니다.
+3. **티어 분류** — 곡마다 직감으로 Tier 1(최애)·2(선호)·3(보통). 권장 비율(10/40/50)은 가이드일 뿐이며, 실제로 나눈 비율에 맞춰 시작 점수가 자동으로 조정됩니다. 곡에 1초 머물면 자동 재생되고, 빠르게 넘기는 동안에는 재생 요청을 보내지 않습니다.
 4. **비교 정렬** — 두 곡 중 더 좋은 쪽을 5단계로 고릅니다. 레이팅이 가까운 곡끼리, 티어 경계를 넘어서도 비교합니다. "상위권 집중"을 켜면 Top 10을 먼저 확정합니다.
 5. **랭킹** — 예상 정확도, 곡별 불확실성(±), 검색·필터, 티어 변경, CSV 내보내기.
 6. **동기화·백업** — Spotify에서 추가·삭제된 곡 반영, Supabase 자동 백업, JSON 백업 파일.
@@ -139,9 +139,9 @@ src/
   core/        순수 로직 — 레이팅 모델(rating/), 저장 형식·마이그레이션(session/). React·브라우저 API 없음
   services/    외부 입출력 — Spotify(auth·api·응답 검증), 저장소(localStorage·Supabase), 설정, 파일 내보내기
   state/       순수 리듀서 + Provider (로컬 자동 저장, 클라우드 동기화, 토스트)
-  player/      Web Playback SDK 훅, 재생 버튼, 임베드 대체 플레이어
+  player/      Web Playback SDK 훅, 재생 요청 줄(playQueue), 재생 버튼, 임베드 대체 플레이어
   phases/      화면: import · tier · sort · rank
-  components/  헤더·저장 상태·공용 UI(ui/)
+  components/  앱 틀(shell/: 사이드바·상단 바·탭 바)·저장 상태·공용 UI(ui/)
   hooks/ lib/ theme/
 bench/         가상 사용자 시뮬레이션 (v1 알고리즘 재현 포함)
 docs/          분석 문서
@@ -156,7 +156,7 @@ docs/          분석 문서
 ## 기술 스택
 
 - **Frontend**: React 19 + TypeScript + Vite
-- **Styling**: Tailwind CSS 4 (CSS 변수 기반 라이트/다크 테마), lucide 아이콘
+- **Styling**: Tailwind CSS 4 (Apple Music 풍, CSS 변수 기반 라이트/다크 테마), 시스템 글꼴 + Pretendard, lucide 아이콘
 - **Auth**: Spotify OAuth (PKCE)
 - **Playback**: Spotify Web Playback SDK (데스크톱 + Premium), 그 외 Spotify 임베드
 - **Storage**: localStorage (로컬 세션) + Supabase (클라우드 백업) + JSON 백업 파일

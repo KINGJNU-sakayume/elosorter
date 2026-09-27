@@ -6,20 +6,21 @@ import Kbd from './Kbd';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
+// 테두리 없이 채움으로 구분한다 (Apple 스타일): 키 컬러 채움 / 회색 채움 / 글자만
 const VARIANT: Record<Variant, string> = {
-  primary: 'border-accent bg-accent text-accent-fg hover:brightness-110 active:brightness-95',
-  secondary: 'border-line bg-transparent text-fg-2 hover:border-line-strong hover:bg-sub hover:text-fg',
-  ghost: 'border-transparent bg-transparent text-fg-2 hover:bg-sub hover:text-fg',
-  danger: 'border-danger-line bg-transparent text-danger hover:bg-danger-soft',
+  primary: 'bg-accent-fill text-accent-fg enabled:hover:brightness-110 enabled:active:brightness-95',
+  secondary: 'bg-sub text-fg enabled:hover:bg-sub-strong',
+  ghost: 'text-accent enabled:hover:bg-sub',
+  danger: 'bg-sub text-danger enabled:hover:bg-danger-soft',
 };
 
 const SIZE: Record<Size, string> = {
-  sm: 'h-8 gap-1.5 rounded-lg px-3 text-xs',
-  md: 'h-10 gap-2 rounded-lg px-4 text-sm',
-  lg: 'h-12 gap-2 rounded-xl px-6 text-base',
+  sm: 'h-8 gap-1.5 rounded-lg px-3 text-[13px]',
+  md: 'h-10 gap-2 rounded-[10px] px-4 text-sm',
+  lg: 'h-12 gap-2 rounded-xl px-6 text-[15px]',
 };
 
-const ICON: Record<Size, number> = { sm: 14, md: 16, lg: 18 };
+const ICON: Record<Size, number> = { sm: 15, md: 17, lg: 19 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -48,14 +49,14 @@ export default function Button({
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex shrink-0 items-center justify-center border font-semibold whitespace-nowrap transition-[background-color,border-color,color,filter] disabled:cursor-not-allowed disabled:opacity-40 ${VARIANT[variant]} ${SIZE[size]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center font-semibold whitespace-nowrap transition-[background-color,color,filter,transform] enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${VARIANT[variant]} ${SIZE[size]} ${className}`}
       {...rest}
     >
       {loading
         ? <LoaderCircle size={ICON[size]} className="animate-spin" aria-hidden />
-        : Icon && <Icon size={ICON[size]} aria-hidden />}
+        : Icon && <Icon size={ICON[size]} strokeWidth={2.2} aria-hidden />}
       {children}
-      {kbd && <span className="ml-1 hidden sm:inline-flex"><Kbd>{kbd}</Kbd></span>}
+      {kbd && <Kbd className="ml-0.5 hidden pointer-fine:inline-flex">{kbd}</Kbd>}
     </button>
   );
 }

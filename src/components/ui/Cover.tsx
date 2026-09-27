@@ -21,12 +21,24 @@ export default function Cover({ src, className = '', lazy = false }: CoverProps)
           alt=""
           loading={lazy ? 'lazy' : undefined}
           decoding="async"
+          draggable={false}
           onError={() => setBroken(src)}
           className="h-full w-full object-cover"
         />
       ) : (
         <Music className="h-1/3 w-1/3 text-fg-3" aria-hidden />
       )}
+    </div>
+  );
+}
+
+/** 여러 곡의 앨범 아트를 2×2로 (Apple Music이 커버 없는 플레이리스트에 쓰는 방식). 4장이 안 되면 첫 장만 */
+export function Mosaic({ images, className = '', lazy = false }: { images: readonly (string | undefined)[]; className?: string; lazy?: boolean }) {
+  const list = images.filter((s): s is string => !!s);
+  if (list.length < 4) return <Cover src={list[0]} className={className} lazy={lazy} />;
+  return (
+    <div className={`grid grid-cols-2 grid-rows-2 overflow-hidden bg-sub ${className}`}>
+      {list.slice(0, 4).map((src, i) => <Cover key={i} src={src} lazy={lazy} className="h-full w-full" />)}
     </div>
   );
 }
