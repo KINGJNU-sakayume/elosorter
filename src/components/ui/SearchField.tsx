@@ -18,7 +18,7 @@ export default function SearchField({ value, onChange, placeholder, label, class
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-8 w-full rounded-lg bg-sub pr-3 pl-8 text-sm text-fg placeholder:text-fg-2 focus:ring-2 focus:ring-accent-line focus:outline-none"
+        className="h-8 w-full rounded-lg bg-sub pr-3 pl-8 text-sm text-fg placeholder:text-fg-2 focus:ring-2 focus:ring-accent-line focus:outline-none pointer-coarse:h-11 pointer-coarse:rounded-[10px] pointer-coarse:text-[15px]"
       />
     </label>
   );

@@ -1,8 +1,16 @@
 import { useState, type FormEvent } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { loadConfig, saveConfig } from '../services/config';
+import { useTheme } from '../theme/context';
+import type { Theme } from '../theme/context';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
+import Segmented from './ui/Segmented';
+
+const THEMES: { value: Theme; label: string }[] = [
+  { value: 'dark', label: '다크' },
+  { value: 'light', label: '라이트' },
+];
 
 interface Props {
   open: boolean;
@@ -44,6 +52,7 @@ function SettingsForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: ()
   const [anonKey, setAnonKey] = useState(initial.anonKey);
   const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { theme, setTheme } = useTheme();
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -66,6 +75,12 @@ function SettingsForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: ()
       </p>
 
       <div className="space-y-4">
+        {/* 좁은 화면에서는 상단 바에 테마 버튼이 없어 여기서 바꾼다. 저장 버튼과 무관하게 바로 적용된다 */}
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[13px] font-semibold" aria-hidden>화면 테마</span>
+          <Segmented label="화면 테마" options={THEMES} value={theme} onChange={setTheme} />
+        </div>
+
         <div>
           <label htmlFor="cfg-client" className={labelCls}>Spotify Client ID</label>
           <input id="cfg-client" className={inputCls} value={clientId} onChange={e => setClientId(e.target.value)}

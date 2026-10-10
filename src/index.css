@@ -2,7 +2,9 @@
 
 /* ── 색상 토큰 (테마별 값) ─────────────────────────────────────────────────
    Apple Music 톤: 흰색/짙은 회색 바탕, 테두리 대신 회색 채움과 얇은 구분선, 키 컬러는 빨강 하나.
-   --accent는 글자·아이콘용, --accent-fill은 흰 글자를 얹는 버튼 바탕용 (다크 모드에서 명도 대비를 맞추려고 나눔) */
+   --accent는 글자·아이콘용, --accent-fill은 흰 글자를 얹는 버튼 바탕용 (다크 모드에서 명도 대비를 맞추려고 나눔).
+   빨강은 누를 수 있는 것(주요 버튼, 글자 버튼)과 지금 위치(현재 단계, 재생 중)에만 쓴다.
+   티어는 순서가 있는 값이라 남색 한 계열의 진하기 3단계로 나타낸다: --tier-N은 바탕, --tier-N-on은 그 위 글자 */
 
 :root {
   color-scheme: dark;
@@ -12,7 +14,7 @@
   --bg-section: #2c2c2e;
   --bg-card: #2c2c2e;
   --bg-sub: rgba(118, 118, 128, 0.24);
-  --bg-sub-strong: rgba(118, 118, 128, 0.3);
+  --bg-sub-strong: rgba(118, 118, 128, 0.36);
   --bg-row-alt: rgba(255, 255, 255, 0.035);
   --bg-row-hover: rgba(255, 255, 255, 0.07);
   --thumb: #636366;
@@ -30,15 +32,12 @@
   --accent-fg: #ffffff;
   --spotify-green: #1ed760;
 
-  --tier-1: #ff8a95;
-  --tier-1-soft: rgba(255, 107, 120, 0.12);
-  --tier-1-fill: #e0223c;
-  --tier-2: #adabff;
-  --tier-2-soft: rgba(142, 140, 255, 0.13);
-  --tier-2-fill: #5e5ce6;
-  --tier-3: #c0c0c5;
-  --tier-3-soft: rgba(161, 161, 166, 0.13);
-  --tier-3-fill: #636366;
+  --tier-1: #6462ea;
+  --tier-1-on: #ffffff;
+  --tier-2: #403e9e;
+  --tier-2-on: #e6e5ff;
+  --tier-3: #3a3a3d;
+  --tier-3-on: #c7c7cc;
 
   --danger: #ff8a82;
   --danger-soft: rgba(255, 105, 97, 0.12);
@@ -61,7 +60,7 @@
   --bg-section: #f5f5f7;
   --bg-card: #ffffff;
   --bg-sub: rgba(118, 118, 128, 0.12);
-  --bg-sub-strong: rgba(118, 118, 128, 0.2);
+  --bg-sub-strong: rgba(118, 118, 128, 0.22);
   --bg-row-alt: rgba(0, 0, 0, 0.028);
   --bg-row-hover: rgba(0, 0, 0, 0.055);
   --thumb: #ffffff;
@@ -79,15 +78,12 @@
   --accent-fg: #ffffff;
   --spotify-green: #1db954;
 
-  --tier-1: #b80d29;
-  --tier-1-soft: rgba(224, 34, 60, 0.09);
-  --tier-1-fill: #e0223c;
-  --tier-2: #4a48c4;
-  --tier-2-soft: rgba(88, 86, 214, 0.1);
-  --tier-2-fill: #5856d6;
-  --tier-3: #56565b;
-  --tier-3-soft: rgba(110, 110, 115, 0.12);
-  --tier-3-fill: #6e6e73;
+  --tier-1: #5856d6;
+  --tier-1-on: #ffffff;
+  --tier-2: #a09ee8;
+  --tier-2-on: #1f1e66;
+  --tier-3: #d4d4d9;
+  --tier-3-on: #3a3a3e;
 
   --danger: #c4001a;
   --danger-soft: rgba(215, 0, 21, 0.06);
@@ -125,14 +121,11 @@
   --color-accent-fg: var(--accent-fg);
   --color-spotify: var(--spotify-green);
   --color-t1: var(--tier-1);
-  --color-t1-soft: var(--tier-1-soft);
-  --color-t1-fill: var(--tier-1-fill);
+  --color-t1-on: var(--tier-1-on);
   --color-t2: var(--tier-2);
-  --color-t2-soft: var(--tier-2-soft);
-  --color-t2-fill: var(--tier-2-fill);
+  --color-t2-on: var(--tier-2-on);
   --color-t3: var(--tier-3);
-  --color-t3-soft: var(--tier-3-soft);
-  --color-t3-fill: var(--tier-3-fill);
+  --color-t3-on: var(--tier-3-on);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-warn: var(--warning);
@@ -180,6 +173,34 @@
 /* 앨범 아트 영역: 남는 공간(가로·세로 중 작은 쪽)에 맞춰 정사각형 크기를 정한다 */
 @utility fit-box {
   container-type: size;
+}
+
+/*
+ * 비교 화면: 두 앨범 아트 + 응답 저울 + 아래 버튼 줄을 한 폭으로 묶는다.
+ * sort-stage가 남는 공간을 재고, 그 안에 들어가는 가장 큰 아트 크기(--art)를 정한다.
+ *   --meta: 아트 아래 곡 정보 높이 / --player: 재생 줄 높이(상태에 따라 컴포넌트가 정함)
+ *   --ctrl: 저울과 아래 버튼 줄, 그 사이 간격을 합친 높이
+ * sort-fit은 아트 두 장과 간격을 합친 폭이라, 저울의 왼쪽 절반이 A 아래, 오른쪽 절반이 B 아래에 온다.
+ */
+@utility sort-stage {
+  container-type: size;
+  --gap: 0.75rem;
+  --meta: 5.75rem;
+  --ctrl: 10.25rem;
+  --player: 0rem;
+  --art: max(6.5rem, min(calc((100cqw - var(--gap)) / 2), calc(100cqh - var(--meta) - var(--player) - var(--ctrl))));
+  min-height: calc(6.5rem + var(--meta) + var(--player) + var(--ctrl));
+  @media (width >= 40rem) {
+    --gap: 1.5rem;
+    --ctrl: 9rem;
+  }
+  @media (width >= 64rem) {
+    --gap: 3rem;
+    --meta: 4.25rem;
+  }
+}
+@utility sort-fit {
+  width: calc(var(--art) * 2 + var(--gap));
 }
 
 /* ── 기본 스타일 ─────────────────────────────────────────────────────── */
