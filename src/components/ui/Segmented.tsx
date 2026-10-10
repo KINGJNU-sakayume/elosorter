@@ -28,7 +28,7 @@ export default function Segmented<T extends string | number>({ options, value, o
             aria-checked={active}
             title={o.title}
             onClick={() => onChange(o.value)}
-            className={`flex h-7 flex-1 items-center justify-center rounded-[7px] px-3 text-[13px] font-semibold whitespace-nowrap text-fg transition-[background-color,box-shadow] ${
+            className={`flex h-7 flex-1 items-center justify-center rounded-[7px] px-3 text-[13px] font-semibold whitespace-nowrap text-fg transition-[background-color,box-shadow] pointer-coarse:h-10 ${
               active ? 'bg-thumb shadow-thumb' : 'hover:bg-sub'
             }`}
           >

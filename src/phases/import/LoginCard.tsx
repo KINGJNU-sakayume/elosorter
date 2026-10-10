@@ -49,7 +49,7 @@ export function HowItWorks() {
       <ol className="mt-3 space-y-4">
         {STEPS.map((s, i) => (
           <li key={s.title} className="flex gap-3.5">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sub text-fg-2">
               <s.icon size={18} aria-hidden />
             </span>
             <div className="min-w-0">
@@ -81,7 +81,7 @@ export function Welcome({ onOpenSettings, children }: { onOpenSettings: () => vo
         <ol className="mt-8 grid w-full gap-2 text-left sm:mt-12 sm:grid-cols-3 sm:gap-4">
           {STEPS.map((s, i) => (
             <li key={s.title} className="flex gap-3.5 rounded-2xl bg-section p-4 sm:block sm:p-5">
-              <s.icon size={22} className="mt-0.5 shrink-0 text-accent sm:mt-0" aria-hidden />
+              <s.icon size={22} className="mt-0.5 shrink-0 text-fg-2 sm:mt-0" aria-hidden />
               <div className="min-w-0">
                 <div className="text-[15px] font-semibold sm:mt-3">
                   <span className="text-fg-2 tabular-nums">{i + 1}. </span>{s.title}

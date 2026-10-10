@@ -7,6 +7,7 @@ import {
   rankTracks,
   rankingAccuracy,
   recomputeRatings,
+  tierOnlyAccuracy,
 } from './engine';
 import { tierPriors } from './priors';
 import { createRng } from './rng';
@@ -111,5 +112,27 @@ describe('rankTracks / rankingAccuracy', () => {
     const acc = rankingAccuracy(tracks)!;
     expect(acc).toBeGreaterThan(0.5);
     expect(acc).toBeLessThan(1);
+  });
+});
+
+describe('tierOnlyAccuracy', () => {
+  it('matches the ranking accuracy while there are no comparisons', () => {
+    const tracks = recomputeRatings(library(), []);
+    expect(tierOnlyAccuracy(tracks)!).toBeCloseTo(rankingAccuracy(tracks)!, 4);
+  });
+
+  it('stays put as comparisons accumulate, so it can serve as the baseline', () => {
+    const before = tierOnlyAccuracy(recomputeRatings(library(), []))!;
+    const matches: Match[] = [['b', 'c', 1], ['d', 'e', 1], ['b', 'c', 1], ['d', 'e', 1]];
+    const tracks = recomputeRatings(library(), matches);
+    expect(tierOnlyAccuracy(tracks)!).toBeCloseTo(before, 10);
+    expect(rankingAccuracy(tracks)!).toBeGreaterThan(before);
+  });
+
+  it('ignores per-track priors and unclassified tracks', () => {
+    const plain = recomputeRatings(library(), []);
+    const withPrior = plain.map(t => (t.id === 'b' ? { ...t, prior: { offset: 120, sd: 40 } } : t));
+    expect(tierOnlyAccuracy(withPrior)).toBe(tierOnlyAccuracy(plain));
+    expect(tierOnlyAccuracy([track('a', 1), track('u', null)])).toBeNull();
   });
 });

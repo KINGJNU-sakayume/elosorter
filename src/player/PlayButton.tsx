@@ -44,7 +44,7 @@ export default function PlayButton({ uri, label, hotkey, size = 'md', showStatus
             </span>
           )}
           <span className="truncate">{statusText(player, playback)}</span>
-          {hotkey && player.status === 'ready' && <Kbd className="hidden pointer-fine:inline-flex">{hotkey}</Kbd>}
+          {hotkey && player.status === 'ready' && <Kbd fineOnly>{hotkey}</Kbd>}
         </span>
       )}
     </div>

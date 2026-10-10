@@ -160,3 +160,18 @@ export function rankTracks(tracks: readonly Track[]): Track[] {
 export function rankingAccuracy(tracks: readonly Track[]): number | null {
   return expectedPairAccuracy(tracks.filter(t => t.tier !== null));
 }
+
+/**
+ * 티어 분류만 했을 때의 예상 정확도: 비교 기록과 곡별 사전분포 없이 티어 사전분포만으로 계산한다.
+ * 화면에서 "비교로 얼마나 올랐는지"의 기준선으로 쓴다.
+ * rankingAccuracy와 같은 순서의 곡 목록을 넘기므로, 곡이 많아 표본 추출로 계산할 때도 같은 쌍을 본다
+ * (비교가 0건이면 두 값이 일치한다).
+ */
+export function tierOnlyAccuracy(tracks: readonly Track[]): number | null {
+  const priors = tierPriors(countTiers(tracks));
+  const items: { rating: number; sigma: number }[] = [];
+  for (const t of tracks) {
+    if (t.tier !== null) items.push({ rating: priors[t.tier].mean, sigma: priors[t.tier].sd });
+  }
+  return expectedPairAccuracy(items);
+}

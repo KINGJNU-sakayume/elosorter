@@ -39,7 +39,7 @@ export default function SessionCard() {
       <div className="flex items-center gap-4">
         <Mosaic images={covers} className="size-16 shrink-0 rounded-lg shadow-thumb sm:size-20" />
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-accent">현재 세션</p>
+          <p className="text-xs font-semibold text-fg-2">현재 세션</p>
           <h2 id="session-title" className="truncate text-xl leading-tight font-bold tracking-tight">{sourceLabel(session)}</h2>
           <p className="mt-0.5 truncate text-xs text-fg-2">
             {session.lastSyncedAt ? `마지막 동기화 ${fmtDateTime(session.lastSyncedAt)}` : '이 브라우저에 저장됨'}

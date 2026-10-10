@@ -10,7 +10,7 @@ import { useTheme } from '../../theme/context';
 import AppMark from '../AppMark';
 import SaveIndicator from '../SaveIndicator';
 import { Mosaic } from '../ui/Cover';
-import { STEPS, untieredBadge } from './steps';
+import { STEPS, stepMeta } from './steps';
 
 const iconBtn = 'flex size-8 shrink-0 items-center justify-center rounded-lg text-fg-2 hover:bg-sub hover:text-fg';
 
@@ -36,7 +36,7 @@ export default function Sidebar({ onOpenSettings }: { onOpenSettings: () => void
           {STEPS.map(step => {
             const enabled = canEnter(step.id, session);
             const active = phase === step.id;
-            const badge = untieredBadge(step.id, session);
+            const meta = stepMeta(step.id, session);
             const Icon = step.icon;
             return (
               <li key={step.id}>
@@ -46,13 +46,16 @@ export default function Sidebar({ onOpenSettings }: { onOpenSettings: () => void
                   aria-current={active ? 'step' : undefined}
                   title={enabled ? undefined : step.locked}
                   onClick={() => dispatch({ type: 'setPhase', phase: step.id })}
-                  className={`flex h-9 w-full items-center gap-3 rounded-lg px-2.5 text-left text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                    active ? 'bg-sub-strong' : 'enabled:hover:bg-sub'
+                  className={`flex h-9 w-full items-center gap-3 rounded-lg px-2.5 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    active ? 'bg-sub-strong font-semibold' : 'font-medium enabled:hover:bg-sub'
                   }`}
                 >
-                  <Icon size={18} strokeWidth={2.1} className="shrink-0 text-accent" aria-hidden />
+                  {/* 지금 단계만 키 컬러. 배경 차이만으로는 대비가 약해 아이콘 색과 글자 굵기도 함께 바꾼다 */}
+                  <Icon size={18} strokeWidth={active ? 2.3 : 2.1} className={`shrink-0 ${active ? 'text-accent' : 'text-fg-2'}`} aria-hidden />
                   <span className="flex-1 truncate">{step.label}</span>
-                  {badge && <span className={`text-xs tabular-nums ${active ? 'text-fg' : 'text-fg-2'}`} aria-label={`미분류 ${badge}곡`}>{badge}</span>}
+                  {meta && (
+                    <span className="text-xs font-medium text-fg-2 tabular-nums" aria-label={meta.label} title={meta.label}>{meta.text}</span>
+                  )}
                 </button>
               </li>
             );
@@ -72,9 +75,7 @@ export default function Sidebar({ onOpenSettings }: { onOpenSettings: () => void
             <Mosaic images={covers} lazy className="size-10 shrink-0 rounded-md shadow-thumb" />
             <span className="min-w-0">
               <span className="block truncate text-[13px] font-semibold">{sourceLabel(session)}</span>
-              <span className="block truncate text-xs text-fg-2 tabular-nums">
-                {fmtCount(session.tracks.length)}곡 · 비교 {fmtCount(session.compCount)}회
-              </span>
+              <span className="block truncate text-xs text-fg-2 tabular-nums">{fmtCount(session.tracks.length)}곡</span>
             </span>
           </button>
         </div>

@@ -38,10 +38,10 @@ export default function SaveIndicator({ variant = 'row' }: { variant?: 'row' | '
                 : { icon: Check, label: '클라우드에 저장됨', title: save.lastCloudSaveAt ? `클라우드 저장: ${save.lastCloudSaveAt.toLocaleTimeString('ko-KR')}` : '클라우드와 동기화됨', tone: 'text-fg-2' };
 
   const Icon = view.icon;
-  const icon = <Icon size={variant === 'row' ? 15 : 18} strokeWidth={2.2} className={`shrink-0 ${view.spin ? 'animate-spin' : ''}`} aria-hidden />;
+  const icon = <Icon size={variant === 'row' ? 15 : 19} strokeWidth={2.2} className={`shrink-0 ${view.spin ? 'animate-spin' : ''}`} aria-hidden />;
   const cls = variant === 'row'
     ? `flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] ${view.tone}`
-    : `flex size-9 items-center justify-center rounded-full ${view.tone}`;
+    : `flex size-11 items-center justify-center rounded-full ${view.tone}`;
   const content = variant === 'row' ? <>{icon}<span className="truncate">{view.label}</span></> : icon;
 
   if (!view.action) {

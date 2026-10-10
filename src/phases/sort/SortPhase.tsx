@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, type CSSProperties } from 'react';
 import { ArrowRight, Layers, ListOrdered, SkipForward, Undo2 } from 'lucide-react';
-import { rankingAccuracy } from '../../core/rating/engine';
+import { rankingAccuracy, tierOnlyAccuracy } from '../../core/rating/engine';
 import type { Focus } from '../../core/rating/pairing';
+import type { Match, Track } from '../../core/types';
 import AccuracyMeter from '../../components/AccuracyMeter';
 import Button from '../../components/ui/Button';
-import Kbd from '../../components/ui/Kbd';
+import Cover from '../../components/ui/Cover';
 import Segmented from '../../components/ui/Segmented';
 import { useHotkeys, type HotkeyMap } from '../../hooks/useHotkeys';
 import { fmtCount } from '../../lib/format';
-import { usePlayer } from '../../player/context';
+import { usePlayer, type PlayerStatus } from '../../player/context';
+import LoginHint from '../../player/LoginHint';
 import { useAppDispatch, useAppState } from '../../state/context';
-import { CHOICE_HOTKEYS, CHOICES } from './choices';
+import { CHOICE_HOTKEYS, verdictOf } from './choices';
+import ChoiceScale from './ChoiceScale';
 import CompareCard from './CompareCard';
 
 const FOCUS_OPTIONS: { value: Focus; label: string; title: string }[] = [
@@ -18,12 +21,37 @@ const FOCUS_OPTIONS: { value: Focus; label: string; title: string }[] = [
   { value: 'top', label: '상위권 집중', title: '현재 상위 15%(최소 10곡) 위주로 비교해 Top 10을 먼저 확정합니다' },
 ];
 
-function verdict(score: number): string {
-  if (score >= 0.99) return '≫';
-  if (score > 0.5) return '>';
-  if (score === 0.5) return '≈';
-  if (score > 0.01) return '<';
-  return '≪';
+/** 곡 정보 아래 재생 줄이 차지하는 높이 (index.css의 sort-stage가 아트 크기를 정할 때 뺀다) */
+const PLAYER_SPACE: Record<PlayerStatus, string> = {
+  off: '0rem',
+  loading: '2.5rem',
+  ready: '2.5rem',
+  embed: '5.5rem',
+};
+
+/**
+ * 직전 비교. 고르는 순간 다음 쌍으로 바뀌므로, 방금 무엇을 기록했는지 확인할 수 있는 유일한 자리다.
+ * 예전의 기호(≫ > ≈ < ≪) 대신 이긴 곡을 굵게, 세기를 말로 적는다.
+ */
+function LastMatch({ match, byId, className = '' }: { match: Match; byId: Map<string, Track>; className?: string }) {
+  const a = byId.get(match[0]);
+  const b = byId.get(match[1]);
+  if (!a || !b) return null;
+  const { winner, word } = verdictOf(match[2]);
+  const [first, second] = winner === 'b' ? [b, a] : [a, b];
+  const thumb = (t: Track, dim: boolean) => (
+    <Cover src={t.thumb ?? t.image} lazy className={`size-[18px] shrink-0 rounded-[4px] sm:size-[22px] ${dim ? 'opacity-70' : ''}`} />
+  );
+  return (
+    <p className={`flex min-w-0 items-center gap-1.5 text-xs text-fg-2 sm:gap-2 sm:text-[13px] ${className}`}>
+      <span className="shrink-0">직전</span>
+      {thumb(first, false)}
+      <span className={`min-w-0 shrink truncate ${winner ? 'font-semibold text-fg' : 'text-fg'}`}>{first.name}</span>
+      <span className="shrink-0">{winner ? `${word} >` : `${word} ≈`}</span>
+      {thumb(second, winner !== null)}
+      <span className={`min-w-0 shrink truncate ${winner ? '' : 'text-fg'}`}>{second.name}</span>
+    </p>
+  );
 }
 
 export default function SortPhase() {
@@ -33,6 +61,7 @@ export default function SortPhase() {
 
   const byId = useMemo(() => new Map(session.tracks.map(t => [t.id, t])), [session.tracks]);
   const accuracy = useMemo(() => rankingAccuracy(session.tracks), [session.tracks]);
+  const baseline = useMemo(() => tierOnlyAccuracy(session.tracks), [session.tracks]);
   const a = curPair ? byId.get(curPair[0]) : undefined;
   const b = curPair ? byId.get(curPair[1]) : undefined;
   const last = session.matches.at(-1);
@@ -81,21 +110,20 @@ export default function SortPhase() {
     );
   }
 
-  const lastA = last ? byId.get(last[0]) : undefined;
-  const lastB = last ? byId.get(last[1]) : undefined;
-
+  // 한 화면에 맞춘다: 위쪽 도구 줄은 제 크기, 나머지 공간(sort-stage)에 아트 두 장·저울·아래 버튼 줄을
+  // 한 폭(sort-fit)으로 묶어 가운데 둔다. 창이 낮아 최소 크기도 안 들어가면 잘리는 대신 스크롤된다.
   return (
-    <div className="flex h-full flex-col gap-3 overflow-y-auto px-3 pt-3 pb-3 sm:px-6 lg:gap-6 lg:px-10 lg:pt-8 lg:pb-8">
-      <header className="flex shrink-0 flex-wrap items-center gap-x-8 gap-y-2.5">
-        <div className="min-w-0 flex-1 basis-full md:basis-auto">
-          <h1 className="text-lg leading-tight font-bold tracking-tight lg:text-[28px]">
-            어느 곡이 더 좋나요? <span className="font-semibold text-fg-3 tabular-nums">#{fmtCount(session.compCount + 1)}</span>
-          </h1>
-          <p className="mt-1 hidden text-sm text-fg-2 lg:block">
-            앨범 아트를 누르거나 아래 버튼·단축키로 고르세요. 모르는 곡이면 건너뛰어도 됩니다.
-          </p>
-        </div>
-        <AccuracyMeter value={accuracy} className="min-w-0 flex-1 md:w-64 md:flex-none" />
+    <div className="flex h-full flex-col gap-3 overflow-y-auto px-3 pt-3 pb-3 sm:px-6 lg:gap-5 lg:px-10 lg:pt-7 lg:pb-7">
+      <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1.5 lg:min-h-10">
+        {/* 좁은 화면에서는 상단 바가 "비교 정렬 #N"을 보여 준다 */}
+        <h1 className="sr-only text-[17px] font-bold tracking-tight lg:not-sr-only">
+          비교 <span className="font-semibold text-fg-3 tabular-nums">#{fmtCount(session.compCount + 1)}</span>
+        </h1>
+        {player.status === 'off' && <LoginHint doing="비교" className="order-last w-full lg:order-none lg:w-auto" />}
+        {player.status === 'embed' && player.reason && (
+          <p className="order-last hidden w-full truncate text-xs text-fg-3 tall:block lg:order-none lg:block lg:w-auto lg:min-w-0 lg:flex-1">{player.reason}</p>
+        )}
+        <AccuracyMeter value={accuracy} baseline={baseline} className="min-w-0 flex-1 lg:ml-auto lg:w-72 lg:flex-none" />
         <Segmented
           label="비교 범위"
           options={FOCUS_OPTIONS}
@@ -104,49 +132,31 @@ export default function SortPhase() {
         />
       </header>
 
-      <div key={`${a.id}|${b.id}`} className="grid min-h-64 flex-1 grid-cols-2 gap-3 sm:gap-6 lg:min-h-80 lg:gap-12">
-        <CompareCard track={a} side="A" playKey="A" onPick={() => choose(1)} />
-        <CompareCard track={b} side="B" playKey="B" onPick={() => choose(0)} />
+      <div
+        className="sort-stage flex flex-1 items-center justify-center"
+        style={{ '--player': PLAYER_SPACE[player.status] } as CSSProperties}
+      >
+        <div className="sort-fit flex flex-col gap-4 sm:gap-5 lg:gap-6">
+          <div key={`${a.id}|${b.id}`} className="grid grid-cols-2 gap-(--gap)">
+            <CompareCard track={a} side="A" playKey="A" onPick={() => choose(1)} />
+            <CompareCard track={b} side="B" playKey="B" onPick={() => choose(0)} />
+          </div>
+
+          <ChoiceScale onChoose={choose} />
+
+          <footer className="flex flex-wrap items-center gap-x-3 gap-y-2 max-sm:-mt-0.5 lg:-mt-1">
+            <Button size="sm" icon={Undo2} kbd="Z" disabled={!last} onClick={undo} className="max-sm:flex-1">되돌리기</Button>
+            {last
+              ? <LastMatch match={last} byId={byId} className="max-sm:order-first max-sm:w-full sm:flex-1" />
+              : <span className="max-sm:hidden sm:flex-1" />}
+            <Button size="sm" icon={SkipForward} kbd="S" onClick={skip} className="max-sm:flex-1">건너뛰기</Button>
+            {/* 좁은 화면에서는 아래 탭 바에 랭킹이 있다 */}
+            <Button size="sm" variant="ghost" icon={ListOrdered} className="max-lg:hidden" onClick={() => dispatch({ type: 'setPhase', phase: 'rank' })}>
+              랭킹 보기
+            </Button>
+          </footer>
+        </div>
       </div>
-
-      <div role="group" aria-label="응답" className="mx-auto grid w-full max-w-4xl shrink-0 grid-cols-5 gap-1.5 sm:gap-2 2xl:max-w-6xl">
-        {CHOICES.map(c => (
-          <button
-            key={c.score}
-            type="button"
-            onClick={() => choose(c.score)}
-            aria-keyshortcuts={c.keys.join(' ')}
-            className={`flex h-12 flex-col items-center justify-center gap-1 rounded-xl bg-section px-1 transition-[background-color,transform] hover:bg-sub-strong active:scale-[0.97] sm:h-14 ${
-              c.score === 0.5 ? 'text-fg-2' : 'text-fg'
-            }`}
-          >
-            <span className="text-[13px] font-semibold sm:text-sm">
-              <span className="sm:hidden">{c.short}</span>
-              <span className="hidden sm:inline">{c.label}</span>
-            </span>
-            <span className="hidden gap-1 pointer-fine:flex">
-              {c.keys.map(k => <Kbd key={k}>{k}</Kbd>)}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {player.status === 'embed' && player.reason && (
-        <p className="-mt-1 hidden shrink-0 text-center text-xs text-fg-3 tall:block lg:block">{player.reason}</p>
-      )}
-
-      <footer className="mx-auto flex w-full max-w-4xl shrink-0 flex-wrap items-center gap-2 2xl:max-w-6xl">
-        <Button size="sm" icon={Undo2} kbd="Z" disabled={!last} onClick={undo}>되돌리기</Button>
-        <Button size="sm" icon={SkipForward} kbd="S" onClick={skip}>건너뛰기</Button>
-        {lastA && lastB && last && (
-          <p className="order-last w-full truncate text-xs text-fg-2 sm:order-none sm:w-auto sm:flex-1 sm:px-2" title="직전 비교">
-            직전: {lastA.name} <span className="font-semibold text-fg">{verdict(last[2])}</span> {lastB.name}
-          </p>
-        )}
-        <Button size="sm" variant="ghost" icon={ListOrdered} className="ml-auto" onClick={() => dispatch({ type: 'setPhase', phase: 'rank' })}>
-          랭킹 보기
-        </Button>
-      </footer>
     </div>
   );
 }
