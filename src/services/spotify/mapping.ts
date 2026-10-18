@@ -26,12 +26,16 @@ function pickThumb(list: Image[]): string | undefined {
 }
 
 /**
- * /me/tracks, /playlists/{id}/tracks 의 item 또는 /tracks 의 track 객체.
+ * /me/tracks, /playlists/{id}/items 의 항목 또는 /tracks/{id} 의 track 객체.
+ * 플레이리스트 항목의 곡은 2026년 2월부터 'track' 대신 'item' 필드에 온다 (예전 응답도 읽는다).
  * 로컬 파일, 삭제된 곡, 팟캐스트 에피소드는 건너뛴다.
  */
 export function trackFromItem(item: unknown): Track | null {
   if (!isObj(item)) return null;
-  const t = isObj(item.track) ? item.track : item.track === null ? null : item;
+  const t = isObj(item.item) ? item.item
+    : isObj(item.track) ? item.track
+    : item.item === null || item.track === null ? null
+    : item;
   if (!t || typeof t.id !== 'string' || !t.id) return null;
   if (t.is_local === true || item.is_local === true) return null;
   if (typeof t.type === 'string' && t.type !== 'track') return null;
