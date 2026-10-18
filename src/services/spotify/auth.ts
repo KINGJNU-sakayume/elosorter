@@ -3,13 +3,16 @@
 
 import { loadConfig } from '../config';
 
+// kingjnu-sakayume.github.io 아래 앱들은 저장소를 함께 쓴다. spotify2가 같은 'spotify_*' 키로
+// 다른 Client ID의 토큰을 저장해서, 앱 이름을 붙인 키로 분리했다.
+// 예전 키의 토큰은 어느 앱 것인지 알 수 없어 옮기지 않는다 (한 번만 다시 로그인하면 된다).
 const KEYS = {
-  access: 'spotify_access_token',
-  refresh: 'spotify_refresh_token',
-  expires: 'spotify_token_expires',
+  access: 'elo:spotify_access_token',
+  refresh: 'elo:spotify_refresh_token',
+  expires: 'elo:spotify_token_expires',
 } as const;
-const PKCE_VERIFIER = 'pkce_verifier';
-const PKCE_STATE = 'pkce_state';
+const PKCE_VERIFIER = 'elo:pkce_verifier';
+const PKCE_STATE = 'elo:pkce_state';
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 
 const SCOPES = [

@@ -20,7 +20,8 @@
   <script>
     (function () {
       try {
-        var saved = localStorage.getItem('theme');
+        // 새 키가 없으면 예전 'theme' 값을 한 번 이어받는다
+        var saved = localStorage.getItem('elo:theme') || localStorage.getItem('theme');
         var theme = (saved === 'light' || saved === 'dark')
           ? saved
           : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
