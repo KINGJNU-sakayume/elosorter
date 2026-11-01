@@ -120,7 +120,7 @@ export function modelTrial(options: ExperimentOptions, seed: number): Record<Fit
   let tracks = recomputeRatings(lib.ids.map(id => toTrack(id, lib.tiers.get(id)!)), []);
   const priors = ordinalPriors(lib);
   const index = new Map(lib.ids.map((id, i) => [id, i]));
-  let theta = Float64Array.from(priors.mean);
+  let theta: Float64Array = Float64Array.from(priors.mean);
   const amount = Math.round(options.n * options.comparisonsPerTrack);
   for (let count = 0; count < amount; count++) {
     const pair = pickNextPair(tracks, matches, { rng: random, focus: 'all' });
