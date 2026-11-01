@@ -53,10 +53,11 @@ function buildLibrary(options: ExperimentOptions, seed: number): Library {
   const sorted = [...original.ids].sort((a, b) => original.truth.get(b)! - original.truth.get(a)!);
   // One genuine favorite misclassified as 'ordinary', and a mediocre song as 'favorite'.
   // Keep tier counts unchanged to isolate the effect of misclassification.
-  const favorite = sorted.find(id => tiers.get(id) === 1)!;
-  const ordinary = [...sorted].reverse().find(id => tiers.get(id) === 3)!;
+  const favorite = sorted[0];
+  const previousTier = tiers.get(favorite)!;
+  const ordinary = [...sorted].reverse().find(id => tiers.get(id) === 3 && id !== favorite)!;
   tiers.set(favorite, 3);
-  tiers.set(ordinary, 1);
+  tiers.set(ordinary, previousTier);
   return { ...original, tiers };
 }
 
