@@ -1,0 +1,25 @@
+name: Ranking research benchmark
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'bench/ordinalModel.ts'
+      - 'bench/nextExperiments.ts'
+      - 'bench/nextExperiments.test.ts'
+      - 'docs/ORDINAL_EXPERIMENTS.md'
+      - '.github/workflows/ranking-research.yml'
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Full research simulation (12 seeds per scenario)
+        run: BENCH=full npx vitest run --config bench/vitest.config.ts bench/nextExperiments.test.ts
