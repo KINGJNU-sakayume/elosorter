@@ -40,6 +40,13 @@ describe('trackFromItem', () => {
     expect(trackFromItem('garbage')).toBeNull();
   });
 
+  it('reads playlist entries in the 2026 /items shape (track → item)', () => {
+    const { track, ...rest } = savedItem('p1');
+    const t = trackFromItem({ ...rest, item: track })!;
+    expect(t).toMatchObject({ id: 'p1', name: 'Song p1', addedAt: '2025-01-02T03:04:05Z', durationMs: 201000 });
+    expect(trackFromItem({ added_at: '2025-01-02T03:04:05Z', item: null })).toBeNull();
+  });
+
   it('tolerates missing artwork', () => {
     const t = trackFromItem(savedItem('x', { album: { name: 'N' } }))!;
     expect(t.image).toBe('');

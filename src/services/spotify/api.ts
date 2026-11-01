@@ -102,8 +102,9 @@ async function getAllPages(
   return pages.flat();
 }
 
+// 2026년 2월 Spotify 개발 모드 변경: /playlists/{id}/tracks → /items, 항목 안의 track → item.
 const PLAYLIST_FIELDS =
-  'total,limit,items(added_at,is_local,track(id,name,uri,type,is_local,duration_ms,artists(name),album(name,images)))';
+  'total,limit,items(added_at,is_local,item(id,name,uri,type,is_local,duration_ms,artists(name),album(name,images)))';
 
 export function playlistIdOf(source: Source): string | null {
   return source.startsWith('playlist:') ? source.slice('playlist:'.length) : null;
@@ -112,7 +113,7 @@ export function playlistIdOf(source: Source): string | null {
 function sourcePath(source: Source): string {
   const playlistId = playlistIdOf(source);
   return playlistId
-    ? `/playlists/${playlistId}/tracks?limit=50&fields=${encodeURIComponent(PLAYLIST_FIELDS)}`
+    ? `/playlists/${playlistId}/items?limit=50&fields=${encodeURIComponent(PLAYLIST_FIELDS)}`
     : '/me/tracks?limit=50';
 }
 
@@ -120,7 +121,18 @@ export async function fetchSourceTracks(
   source: Source,
   onProgress?: (loaded: number, total: number) => void,
 ): Promise<Track[]> {
-  return uniqueTracks(await getAllPages(sourcePath(source), onProgress));
+  try {
+    return uniqueTracks(await getAllPages(sourcePath(source), onProgress));
+  } catch (e) {
+    // 2026년 2월부터 개발 모드 앱은 내가 만들었거나 공동 편집하는 플레이리스트의 곡만 받을 수 있다.
+    if (playlistIdOf(source) && e instanceof SpotifyApiError && (e.status === 403 || e.status === 404)) {
+      throw new SpotifyApiError(
+        e.status,
+        '이 플레이리스트의 곡을 불러올 수 없습니다. Spotify 정책상 내가 만들었거나 공동 편집하는 플레이리스트만 됩니다',
+      );
+    }
+    throw e;
+  }
 }
 
 export async function fetchMe(): Promise<SpotifyUser> {
@@ -143,20 +155,27 @@ export async function fetchPlaylistName(id: string): Promise<string | null> {
   }
 }
 
-/** 재생 길이가 없는 옛 곡 보강. 엔드포인트가 막혀 있으면(403/404) 조용히 중단 */
+/**
+ * 재생 길이가 없는 옛 곡 보강. 여러 곡을 한 번에 받는 /tracks?ids= 가 2026년 2월에 없어져
+ * /tracks/{id} 를 한 곡씩, 동시에 최대 4개 요청한다. 엔드포인트가 막혀 있으면(403) 조용히 중단,
+ * 없어진 곡(404)은 건너뛴다.
+ */
 export async function fetchDurations(ids: readonly string[]): Promise<{ id: string; durationMs: number }[]> {
   const out: { id: string; durationMs: number }[] = [];
-  for (let i = 0; i < ids.length; i += 50) {
-    try {
-      const data = await request<{ tracks?: unknown[] }>(`/tracks?ids=${ids.slice(i, i + 50).join(',')}`);
-      for (const t of data?.tracks ?? []) {
-        const { id, duration_ms } = (t ?? {}) as { id?: unknown; duration_ms?: unknown };
-        if (typeof id === 'string' && typeof duration_ms === 'number') out.push({ id, durationMs: duration_ms });
+  let cursor = 0;
+  let blocked = false;
+  const worker = async () => {
+    while (!blocked && cursor < ids.length) {
+      const id = ids[cursor++];
+      try {
+        const t = await request<{ id?: unknown; duration_ms?: unknown }>(`/tracks/${encodeURIComponent(id)}`);
+        if (typeof t?.id === 'string' && typeof t.duration_ms === 'number') out.push({ id: t.id, durationMs: t.duration_ms });
+      } catch (e) {
+        if (e instanceof SpotifyApiError && e.status === 403) blocked = true;
       }
-    } catch (e) {
-      if (e instanceof SpotifyApiError && (e.status === 403 || e.status === 404)) break;
     }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
   return out;
 }
 
