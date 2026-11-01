@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Track } from '../core/types';
+import { countTiers } from '../core/rating/engine';
+import { tierPriors } from '../core/rating/priors';
 import { createInitialState, reducer, type Action, type AppState } from './reducer';
 
 function track(id: string): Track {
@@ -128,7 +130,7 @@ describe('sort phase', () => {
 });
 
 describe('ranking edits', () => {
-  it('retier drops the explicit prior and changes the rating', () => {
+  it('retiering retains compressed comparison evidence instead of deleting its prior', () => {
     const s = sortedSession();
     const t = s.session.tracks.find(x => x.tier === 3)!;
     const withPrior: AppState = {
@@ -139,9 +141,27 @@ describe('ranking edits', () => {
       },
     };
     const next = reducer(withPrior, { type: 'retier', id: t.id, tier: 1 });
-    expect(byId(next, t.id).tier).toBe(1);
-    expect(byId(next, t.id).prior).toBeUndefined();
-    expect(byId(next, t.id).rating).toBeGreaterThan(byId(s, t.id).rating);
+    const edited = byId(next, t.id);
+    expect(edited.tier).toBe(1);
+    expect(edited.prior).toBeDefined();
+    expect(edited.prior!.sd).toBeLessThan(tierPriors(countTiers(next.session.tracks))[1].sd);
+    expect(edited.rating).toBeGreaterThan(byId(s, t.id).rating);
+  });
+
+  it('rebases untouched compacted priors when tier proportions change', () => {
+    const s = sortedSession();
+    const edit = s.session.tracks.find(x => x.tier === 3)!;
+    const untouched = s.session.tracks.find(x => x.tier === 2)!;
+    const original = s.session.tracks.map(x =>
+      x.id === untouched.id ? { ...x, prior: { offset: 25, sd: 8 } } : x);
+    const oldBase = tierPriors(countTiers(original))[2];
+    const oldAbsoluteMean = oldBase.mean + 25;
+    const withPrior: AppState = { ...s, session: { ...s.session, tracks: original } };
+    const next = reducer(withPrior, { type: 'retier', id: edit.id, tier: 1 });
+    const newBase = tierPriors(countTiers(next.session.tracks))[2];
+    const newAbsoluteMean = newBase.mean + byId(next, untouched.id).prior!.offset;
+    // Small posterior SD means historical evidence should dominate a share change.
+    expect(Math.abs(newAbsoluteMean - oldAbsoluteMean)).toBeLessThan(2);
   });
 });
 

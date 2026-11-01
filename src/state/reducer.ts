@@ -1,6 +1,7 @@
 // 앱 상태 전이. 순수 함수 — 무작위성은 state.seed로, 시간은 액션 페이로드로 받는다.
 
-import { compactMatches, pickNextPair, recomputeRatings } from '../core/rating/engine';
+import { compactMatches, countTiers, pickNextPair, recomputeRatings } from '../core/rating/engine';
+import { tierPriors } from '../core/rating/priors';
 import { pairKey, type Focus } from '../core/rating/pairing';
 import { createRng } from '../core/rating/rng';
 import { SESSION_VERSION, type SessionData } from '../core/session/schema';
@@ -12,7 +13,7 @@ const PHASES: readonly Phase[] = ['import', 'tier', 'sort', 'rank'];
 
 /** 이 횟수만큼 비교하면 '신규' 표시를 뗀다 */
 const NEW_TRACK_THRESHOLD = 5;
-/** 비교 기록이 이만큼 쌓이면 오래된 기록을 사전분포로 압축 */
+/** 오래된 비교를 곡별 사전분포로 근사 압축하는 기존 저장 용량 상한 */
 const MAX_MATCHES = 4000;
 const KEEP_MATCHES = 3000;
 /** 건너뛴 쌍을 기억하는 개수 */
@@ -154,8 +155,49 @@ function withTier(t: Track, tier: Tier | null): Track {
   return { ...rest, tier };
 }
 
+/**
+ * Compacted comparisons and migrated v1 ratings live in a per-track Gaussian prior.
+ * Retiering must not erase that evidence. Convert the old posterior approximation into
+ * Gaussian likelihood information, then combine it with the new tier prior.
+ *
+ * Rebase all explicit priors, not just edited tracks: tier shares (and thus tier means)
+ * change whenever a user edits a tier.
+ */
 function setTiers(state: AppState, ids: ReadonlySet<string>, tier: Tier | null): Track[] {
-  const tracks = state.session.tracks.map(t => (ids.has(t.id) && t.tier !== tier ? withTier(t, tier) : t));
+  const before = state.session.tracks;
+  const oldPriors = tierPriors(countTiers(before));
+  const changed = before.map(t => (ids.has(t.id) && t.tier !== tier ? { ...t, tier } : t));
+  const newPriors = tierPriors(countTiers(changed));
+  const tracks = changed.map((t, i) => {
+    const original = before[i];
+    if (!original.prior) return t;
+    // An unclassified track cannot carry a valid tier-relative prior.
+    if (original.tier === null || t.tier === null) {
+      const { prior: _discarded, ...rest } = t;
+      void _discarded;
+      return rest;
+    }
+    const oldBase = oldPriors[original.tier];
+    const newBase = newPriors[t.tier];
+    const oldPosterior = original.prior;
+    const posteriorPrecision = 1 / (oldPosterior.sd ** 2);
+    const oldBasePrecision = 1 / (oldBase.sd ** 2);
+    // Rounding in saved priors can make this slightly negative.
+    const evidencePrecision = Math.max(0, posteriorPrecision - oldBasePrecision);
+    const evidenceWeightedMean =
+      (oldBase.mean + oldPosterior.offset) * posteriorPrecision -
+      oldBase.mean * oldBasePrecision;
+    const newBasePrecision = 1 / (newBase.sd ** 2);
+    const precision = newBasePrecision + evidencePrecision;
+    const mean = (newBase.mean * newBasePrecision + evidenceWeightedMean) / precision;
+    return {
+      ...t,
+      prior: {
+        offset: Math.round((mean - newBase.mean) * 100) / 100,
+        sd: Math.round(Math.sqrt(1 / precision) * 100) / 100,
+      },
+    };
+  });
   return recomputeRatings(tracks, state.session.matches);
 }
 
@@ -315,8 +357,10 @@ export function reducer(state: AppState, action: Action): AppState {
       const score = Math.min(1, Math.max(0, action.score));
       const [a, b] = curPair;
       let matches = [...state.session.matches, [a, b, score] as [string, string, number]];
-      let tracks = state.session.tracks.map(t => (t.id === a || t.id === b ? bumpComparisons(t, 1) : t));
-      tracks = recomputeRatings(tracks, matches);
+      let tracks = recomputeRatings(
+        state.session.tracks.map(t => (t.id === a || t.id === b ? bumpComparisons(t, 1) : t)),
+        matches,
+      );
       if (matches.length > MAX_MATCHES) ({ tracks, matches } = compactMatches(tracks, matches, KEEP_MATCHES));
       const next = commit(state, { tracks, matches, compCount: state.session.compCount + 1 });
       return withPair({ ...next, tierHistory: [] }, curPair);

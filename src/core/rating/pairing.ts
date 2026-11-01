@@ -90,15 +90,27 @@ export function selectPair(
   const neighbors: PairCandidate[] = [];
   let up = pos - 1;
   let down = pos + 1;
-  while (neighbors.length < NEIGHBORS && (up >= 0 || down < byRating.length)) {
+  const nextClosest = (): PairCandidate => {
     const dUp = up >= 0 ? byRating[up].rating - a.rating : Infinity;
     const dDown = down < byRating.length ? a.rating - byRating[down].rating : Infinity;
-    neighbors.push(dUp <= dDown ? byRating[up--] : byRating[down++]);
+    return dUp <= dDown ? byRating[up--] : byRating[down++];
+  };
+  while (neighbors.length < NEIGHBORS && (up >= 0 || down < byRating.length)) {
+    neighbors.push(nextClosest());
   }
 
-  // 이미 비교한 쌍은 다른 후보가 없을 때만 다시 낸다
+  // 이미 비교한 쌍은 다른 후보가 없을 때만 다시 낸다.
+  // 가까운 24곡이 모두 소진돼도 멀리 있는 새 쌍을 먼저 찾아야 한다.
   const opponents = preferNot(neighbors, avoid);
-  const fresh = seen?.size ? opponents.filter(c => !seen.has(pairKey(a.id, c.id))) : opponents;
+  let fresh = seen?.size ? opponents.filter(c => !seen.has(pairKey(a.id, c.id))) : opponents;
+  if (fresh.length === 0 && seen?.size) {
+    const farther: PairCandidate[] = [];
+    while (farther.length < TOP_CHOICES && (up >= 0 || down < byRating.length)) {
+      const c = nextClosest();
+      if (!seen.has(pairKey(a.id, c.id))) farther.push(c);
+    }
+    fresh = preferNot(farther, avoid);
+  }
   const best = (fresh.length ? fresh : opponents)
     .map(c => ({ c, gain: outcomeUncertainty(a, c) }))
     .sort((x, y) => y.gain - x.gain)
