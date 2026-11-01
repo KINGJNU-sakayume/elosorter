@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, LoaderCircle, Pause, Play } from 'lucide-react';
 import SpotifyLogo from '../components/SpotifyLogo';
+import { claimEmbed, releaseEmbed, stopEmbed } from './embedPlayback';
 
 /**
  * Compact fallback based on Spotify's official iFrame API. Keep Spotify's unmodified
@@ -34,7 +35,6 @@ declare global {
 
 let iframeApi: SpotifyIframeAPI | null = null;
 let loadingApi: Promise<SpotifyIframeAPI> | null = null;
-let activeEmbed: EmbedController | null = null;
 
 function loadIframeApi(): Promise<SpotifyIframeAPI> {
   if (iframeApi) return Promise.resolve(iframeApi);
@@ -61,17 +61,6 @@ function loadIframeApi(): Promise<SpotifyIframeAPI> {
   return loadingApi;
 }
 
-/** Called when ranking moves to another comparison, or a tier page unmounts. */
-export function pauseActiveEmbed(): void {
-  activeEmbed?.pause();
-  activeEmbed = null;
-}
-
-function claimPlayback(controller: EmbedController): void {
-  if (activeEmbed && activeEmbed !== controller) activeEmbed.pause();
-  activeEmbed = controller;
-}
-
 export default function EmbedPlayer({ trackId, title }: { trackId: string; title: string }) {
   const host = useRef<HTMLDivElement>(null);
   const controller = useRef<EmbedController | null>(null);
@@ -96,13 +85,14 @@ export default function EmbedPlayer({ trackId, title }: { trackId: string; title
             embed.addListener('ready', () => { if (!cancelled) setReady(true); });
             embed.addListener('playback_started', () => {
               if (cancelled) return;
-              claimPlayback(embed);
+              claimEmbed(embed);
               setPlaying(true);
             });
             embed.addListener('playback_update', event => {
               if (cancelled) return;
               const paused = event.data?.isPaused;
-              if (paused === false) claimPlayback(embed);
+              if (paused === false) claimEmbed(embed);
+              if (paused === true) releaseEmbed(embed);
               if (typeof paused === 'boolean') setPlaying(!paused);
             });
           },
@@ -112,7 +102,7 @@ export default function EmbedPlayer({ trackId, title }: { trackId: string; title
     return () => {
       cancelled = true;
       if (owned) {
-        if (activeEmbed === owned) pauseActiveEmbed();
+        stopEmbed(owned);
         owned.destroy();
       }
       controller.current = null;
@@ -123,11 +113,10 @@ export default function EmbedPlayer({ trackId, title }: { trackId: string; title
     const embed = controller.current;
     if (!embed || !ready) return;
     if (playing) {
-      embed.pause();
-      if (activeEmbed === embed) activeEmbed = null;
+      stopEmbed(embed);
       setPlaying(false);
     } else {
-      claimPlayback(embed);
+      claimEmbed(embed);
       embed.play();
       // Wait for playback_update instead of pretending playback succeeded.
     }
