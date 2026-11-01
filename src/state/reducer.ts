@@ -1,6 +1,6 @@
 // 앱 상태 전이. 순수 함수 — 무작위성은 state.seed로, 시간은 액션 페이로드로 받는다.
 
-import { countTiers, pickNextPair, recomputeRatings } from '../core/rating/engine';
+import { compactMatches, countTiers, pickNextPair, recomputeRatings } from '../core/rating/engine';
 import { tierPriors } from '../core/rating/priors';
 import { pairKey, type Focus } from '../core/rating/pairing';
 import { createRng } from '../core/rating/rng';
@@ -13,6 +13,9 @@ const PHASES: readonly Phase[] = ['import', 'tier', 'sort', 'rank'];
 
 /** 이 횟수만큼 비교하면 '신규' 표시를 뗀다 */
 const NEW_TRACK_THRESHOLD = 5;
+/** 오래된 비교를 곡별 사전분포로 근사 압축하는 기존 저장 용량 상한 */
+const MAX_MATCHES = 4000;
+const KEEP_MATCHES = 3000;
 /** 건너뛴 쌍을 기억하는 개수 */
 const SKIP_MEMORY = 200;
 
@@ -353,11 +356,12 @@ export function reducer(state: AppState, action: Action): AppState {
       if (!curPair || curPair[0] !== action.pair[0] || curPair[1] !== action.pair[1]) return state;
       const score = Math.min(1, Math.max(0, action.score));
       const [a, b] = curPair;
-      const matches = [...state.session.matches, [a, b, score] as [string, string, number]];
-      const tracks = recomputeRatings(
+      let matches = [...state.session.matches, [a, b, score] as [string, string, number]];
+      let tracks = recomputeRatings(
         state.session.tracks.map(t => (t.id === a || t.id === b ? bumpComparisons(t, 1) : t)),
         matches,
       );
+      if (matches.length > MAX_MATCHES) ({ tracks, matches } = compactMatches(tracks, matches, KEEP_MATCHES));
       const next = commit(state, { tracks, matches, compCount: state.session.compCount + 1 });
       return withPair({ ...next, tierHistory: [] }, curPair);
     }
