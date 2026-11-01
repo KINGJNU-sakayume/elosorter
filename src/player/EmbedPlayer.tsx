@@ -39,7 +39,7 @@ let loadingApi: Promise<SpotifyIframeAPI> | null = null;
 function loadIframeApi(): Promise<SpotifyIframeAPI> {
   if (iframeApi) return Promise.resolve(iframeApi);
   if (loadingApi) return loadingApi;
-  loadingApi = new Promise((resolve, reject) => {
+  const promise = new Promise<SpotifyIframeAPI>((resolve, reject) => {
     const script = document.createElement('script');
     const timeout = window.setTimeout(() => reject(new Error('Spotify Embed 초기화 시간 초과')), 12000);
     window.onSpotifyIframeApiReady = api => {
@@ -58,7 +58,8 @@ function loadIframeApi(): Promise<SpotifyIframeAPI> {
     loadingApi = null;
     throw error;
   });
-  return loadingApi;
+  loadingApi = promise;
+  return promise;
 }
 
 export default function EmbedPlayer({ trackId, title }: { trackId: string; title: string }) {
