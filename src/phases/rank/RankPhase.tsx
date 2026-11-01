@@ -123,7 +123,7 @@ export default function RankPhase() {
             <span>앨범</span>
             <span>티어</span>
             <span className="text-right">레이팅</span>
-            <span className="hidden justify-between text-[11px] font-normal text-fg-3 tabular-nums xl:flex">
+            <span className="hidden justify-between text-xs font-normal text-fg-3 tabular-nums xl:flex">
               <span>{axisLo}</span><span>± 불확실성</span><span>{axisHi}</span>
             </span>
             <span className="text-right">비교</span>

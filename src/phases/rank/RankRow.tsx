@@ -149,7 +149,7 @@ function RankRow({ track, rank, band, axisLo, axisHi, playback, onToggle, onReti
       <span className="text-right text-[13px] leading-tight font-semibold tabular-nums">
         {Math.round(track.rating)}
         {track.sigma !== undefined && (
-          <span className="block text-[11px] font-normal text-fg-2 sm:ml-1 sm:inline">±{Math.round(track.sigma)}</span>
+          <span className="block text-xs font-normal text-fg-2 sm:ml-1 sm:inline">±{Math.round(track.sigma)}</span>
         )}
       </span>
       <RatingRange rating={track.rating} sigma={track.sigma} lo={axisLo} hi={axisHi} />

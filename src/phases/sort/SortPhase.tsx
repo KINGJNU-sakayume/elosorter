@@ -112,6 +112,8 @@ export default function SortPhase() {
 
   // 한 화면에 맞춘다: 위쪽 도구 줄은 제 크기, 나머지 공간(sort-stage)에 아트 두 장·저울·아래 버튼 줄을
   // 한 폭(sort-fit)으로 묶어 가운데 둔다. 창이 낮아 최소 크기도 안 들어가면 잘리는 대신 스크롤된다.
+  // 좁은 화면(lg 미만)은 세로로 남는 공간이 생기므로 저울과 버튼 줄을 아래(탭 바 위, 엄지 쪽)에 붙이고
+  // 아트는 그 위 남는 공간의 가운데에 둔다.
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto px-3 pt-3 pb-3 sm:px-6 lg:gap-5 lg:px-10 lg:pt-7 lg:pb-7">
       <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1.5 lg:min-h-10">
@@ -136,8 +138,8 @@ export default function SortPhase() {
         className="sort-stage flex flex-1 items-center justify-center"
         style={{ '--player': PLAYER_SPACE[player.status] } as CSSProperties}
       >
-        <div className="sort-fit flex flex-col gap-4 sm:gap-5 lg:gap-6">
-          <div key={`${a.id}|${b.id}`} className="grid grid-cols-2 gap-(--gap)">
+        <div className="sort-fit flex flex-col gap-4 max-lg:self-stretch sm:gap-5 lg:gap-6">
+          <div key={`${a.id}|${b.id}`} className="grid grid-cols-2 gap-(--gap) max-lg:my-auto">
             <CompareCard track={a} side="A" playKey="A" onPick={() => choose(1)} />
             <CompareCard track={b} side="B" playKey="B" onPick={() => choose(0)} />
           </div>

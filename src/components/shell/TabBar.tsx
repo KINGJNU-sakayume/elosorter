@@ -24,7 +24,7 @@ export default function TabBar() {
             aria-current={active ? 'step' : undefined}
             title={enabled ? undefined : step.locked}
             onClick={() => dispatch({ type: 'setPhase', phase: step.id })}
-            className={`flex h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors disabled:opacity-35 ${
+            className={`flex h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors disabled:opacity-35 ${
               active ? 'text-accent' : 'text-fg-3'
             }`}
           >
@@ -32,7 +32,7 @@ export default function TabBar() {
               <Icon size={22} strokeWidth={active ? 2.3 : 2} aria-hidden />
               {badge && (
                 <span
-                  className="absolute -top-1.5 left-3.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-fill px-1 text-[10px] leading-none font-semibold whitespace-nowrap text-white tabular-nums"
+                  className="absolute -top-1.5 left-3.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-fill px-1 text-[11px] leading-none font-semibold whitespace-nowrap text-white tabular-nums"
                   aria-label={`미분류 ${badge}곡`}
                 >
                   {badge}
