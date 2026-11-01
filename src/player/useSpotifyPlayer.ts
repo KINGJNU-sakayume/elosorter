@@ -4,7 +4,7 @@ import { playOnDevice, playRetryDelay } from '../services/spotify/api';
 import { auth } from '../services/spotify/auth';
 import type { Player, PlayerStatus } from './context';
 import { createPlayQueue, type PlayQueue } from './playQueue';
-import { pauseActiveEmbed } from './EmbedPlayer';
+import { pauseActiveEmbed } from './embedPlayback';
 import type { SdkPlayer } from './spotify-sdk';
 
 const IS_MOBILE = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
