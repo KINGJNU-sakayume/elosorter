@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react';
 
 /**
  * off: 로그인 전 / loading: SDK·기기 준비 중 / ready: 전곡 재생 가능
- * embed: SDK를 쓸 수 없음(모바일, Premium 아님, 오류) → Spotify 임베드 플레이어로 대체
+ * embed: SDK를 쓸 수 없음(Premium 아님, 인증/DRM/브라우저 오류) → Spotify iFrame API 대체
  */
 export type PlayerStatus = 'off' | 'loading' | 'ready' | 'embed';
 
