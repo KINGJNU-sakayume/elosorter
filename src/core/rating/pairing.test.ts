@@ -57,6 +57,21 @@ describe('selectPair', () => {
     }
   });
 
+  it('searches beyond the 24 closest songs before repeating an old comparison', () => {
+    const cands = make(100, i => (i === 50 ? { sigma: 120 } : {}));
+    const seen = new Set<string>();
+    for (let i = 38; i <= 62; i++) {
+      if (i !== 50) seen.add(pairKey('t50', `t${i}`));
+    }
+    for (let seed = 0; seed < 40; seed++) {
+      const pair = selectPair(cands, { rng: createRng(seed), seen })!;
+      expect(pair).toContain('t50');
+      expect(seen.has(pairKey(...pair))).toBe(false);
+      const other = pair.find(id => id !== 't50')!;
+      expect(Math.abs(Number(other.slice(1)) - 50)).toBeGreaterThan(12);
+    }
+  });
+
   it('avoids the previous pair when it can', () => {
     const cands = make(10);
     const avoid = new Set(['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7']);
