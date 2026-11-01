@@ -75,7 +75,7 @@ export default function CompareCard({ track, side, onPick, playKey }: Props) {
         <div className="mt-2">
           {player.status === 'embed'
             ? <EmbedPlayer trackId={track.id} title={track.name} />
-            : <PlayButton uri={track.uri} label={`${side} ${track.name}`} hotkey={playKey} size="sm" showStatus />}
+            : <PlayButton uri={track.uri} label={`${side} ${track.name}`} hotkey={playKey} size="sm" />}
         </div>
       )}
     </article>

@@ -26,7 +26,7 @@ const PLAYER_SPACE: Record<PlayerStatus, string> = {
   off: '0rem',
   loading: '2.5rem',
   ready: '2.5rem',
-  embed: '5.5rem',
+  embed: '2.5rem',
 };
 
 /**
