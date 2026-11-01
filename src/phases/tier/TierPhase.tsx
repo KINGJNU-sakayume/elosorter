@@ -213,7 +213,7 @@ function TierButton({ tier, count, onClick }: { tier: Tier; count: number; onCli
         </span>
         <span className="hidden truncate text-[13px] text-fg-2 lg:block">{style.hint}</span>
       </span>
-      <span className="text-[11px] text-fg-2 tabular-nums lg:text-[15px] lg:font-semibold lg:text-fg">{fmtCount(count)}곡</span>
+      <span className="text-xs text-fg-2 tabular-nums lg:text-[15px] lg:font-semibold lg:text-fg">{fmtCount(count)}곡</span>
     </button>
   );
 }
@@ -241,7 +241,8 @@ function TierDistribution({ counts }: { counts: TierCounts }) {
             ? TIERS.map(t => counts[t] > 0 && (
                 <span
                   key={t}
-                  className={`basis-0 transition-[flex-grow] duration-300 ${TIER_STYLE[t].fill}`}
+                  // 티어 3의 채움은 배경과 1.5 : 1이라 가는 윤곽선으로 경계를 드러낸다
+                  className={`basis-0 transition-[flex-grow] duration-300 ${TIER_STYLE[t].fill} ${t === 3 ? 'ring-1 ring-fg-3 ring-inset' : ''}`}
                   style={{ flexGrow: counts[t] }}
                   title={`${TIER_STYLE[t].name} ${fmtCount(counts[t])}곡 · ${share(t)}`}
                 />
@@ -249,7 +250,8 @@ function TierDistribution({ counts }: { counts: TierCounts }) {
             : <span className="flex-1 bg-sub" />}
         </div>
       </div>
-      <div className="hidden gap-3.5 text-xs text-fg-2 tabular-nums lg:flex" aria-hidden>
+      {/* 휴대폰에서도 보이게 한다: 막대가 색으로만 구분되면 티어를 알 수 없다 */}
+      <div className="flex flex-wrap justify-center gap-x-3.5 gap-y-1 text-xs text-fg-2 tabular-nums lg:justify-start" aria-hidden>
         {TIERS.map(t => <span key={t}>{TIER_STYLE[t].name} {share(t)}</span>)}
       </div>
       <p className="hidden text-center text-xs leading-relaxed text-fg-2 tall:block lg:block lg:text-left">

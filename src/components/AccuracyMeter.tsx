@@ -32,11 +32,6 @@ export default function AccuracyMeter({ value, baseline = null, className = '' }
       <div className="flex items-baseline gap-2 text-[13px] leading-none whitespace-nowrap">
         <span className="text-fg-2">예상 정확도</span>
         <span className="text-[15px] font-bold tabular-nums">{value === null ? '—' : fmtPercent(value)}</span>
-        {gain !== null && gain >= 0.0005 && (
-          <span className="ml-auto text-xs text-fg-2 tabular-nums">
-            <span className="max-sm:sr-only">비교로 </span>+{(gain * 100).toFixed(1)}%p
-          </span>
-        )}
       </div>
       <div
         role="meter"
@@ -63,6 +58,14 @@ export default function AccuracyMeter({ value, baseline = null, className = '' }
           />
         )}
       </div>
+      {/* 세로 눈금이 무엇인지는 예전에는 title 툴팁에만 있어 터치 기기에서는 볼 수 없었다. 범례를 글자로 둔다 */}
+      {baseline !== null && (
+        <p className="flex items-center gap-1.5 text-xs leading-none whitespace-nowrap text-fg-2 tabular-nums">
+          <span aria-hidden className="h-2.5 w-0.5 shrink-0 rounded-[1px] bg-fg-2" />
+          <span>티어만 {fmtPercent(baseline)}</span>
+          {gain !== null && gain >= 0.0005 && <span>· 비교로 +{(gain * 100).toFixed(1)}%p</span>}
+        </p>
+      )}
     </div>
   );
 }
