@@ -17,3 +17,6 @@ export const fmtPercent = (x: number, digits = 1): string => `${(x * 100).toFixe
 export function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
+
+/** 바이트 수를 KiB(1024바이트)로. 문서 크기 표시용 */
+export const fmtKiB = (bytes: number): string => `${(bytes / 1024).toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KiB`;

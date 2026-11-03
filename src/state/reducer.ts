@@ -76,6 +76,7 @@ function emptySession(): SessionData {
     lastSyncedAt: null,
     savedAt: null,
     syncedAt: null,
+    syncVersion: null,
   };
 }
 

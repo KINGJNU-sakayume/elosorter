@@ -4,6 +4,7 @@ import { loadConfig, saveConfig } from '../services/config';
 import { useTheme } from '../theme/context';
 import type { Theme } from '../theme/context';
 import Button from './ui/Button';
+import SyncSize from './SyncSize';
 import Modal from './ui/Modal';
 import Segmented from './ui/Segmented';
 
@@ -80,6 +81,8 @@ function SettingsForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: ()
           <span className="text-[13px] font-semibold" aria-hidden>화면 테마</span>
           <Segmented label="화면 테마" options={THEMES} value={theme} onChange={setTheme} />
         </div>
+
+        <SyncSize />
 
         <div>
           <label htmlFor="cfg-client" className={labelCls}>Spotify Client ID</label>
