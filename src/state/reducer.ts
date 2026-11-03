@@ -33,13 +33,16 @@ export interface AppState {
   pendingRemovedIds: string[];
   /** 세션이 바뀔 때마다 +1 */
   revision: number;
-  /** 클라우드에 올라간 revision */
+  /** 클라우드(Supabase)에 올라간 revision */
   cloudRevision: number;
+  /** Life Hub에 올라간 revision (Supabase와 따로 센다: 두 곳의 저장 상태가 서로를 가리지 않게) */
+  hubRevision: number;
   seed: number;
 }
 
 export type Action =
-  | { type: 'hydrate'; session: SessionData; origin: 'cloud' | 'file' }
+  /** origin 'hub': Life Hub에서 받은 사본 — session.syncVersion이 그 서버 version이다 */
+  | { type: 'hydrate'; session: SessionData; origin: 'cloud' | 'file' | 'hub' }
   | { type: 'newSession'; source: Source; sourceName: string | null; tracks: Track[] }
   | { type: 'reset' }
   | { type: 'setPhase'; phase: Phase }
@@ -61,6 +64,10 @@ export type Action =
   | { type: 'enrichDurations'; items: readonly { id: string; durationMs: number }[] }
   | { type: 'setSourceName'; name: string }
   | { type: 'cloudSaved'; revision: number; savedAt: string }
+  /** Life Hub 업로드 성공 (또는 서버와 내용이 같음을 확인): 이 version이 새 기준이다 */
+  | { type: 'hubSaved'; revision: number; version: number }
+  /** Life Hub 기준 version만 바꾼다 (내용 그대로) */
+  | { type: 'hubBase'; version: number }
   | { type: 'markDirty' };
 
 function emptySession(): SessionData {
@@ -112,6 +119,7 @@ export function createInitialState(
     pendingRemovedIds: [],
     revision: 0,
     cloudRevision: 0,
+    hubRevision: 0,
     seed: seed >>> 0,
   };
   if (isPhase(ui.phase) && canEnter(ui.phase, state.session)) state.phase = ui.phase;
@@ -251,6 +259,8 @@ export function reducer(state: AppState, action: Action): AppState {
         tracks: recomputeRatings(action.session.tracks, action.session.matches),
         // 클라우드에서 받은 버전이면 그 버전을 기준점으로 삼는다
         syncedAt: action.origin === 'cloud' ? action.session.savedAt : null,
+        // Life Hub 기준 version은 Life Hub에서 받은 사본만 가진다 (파일·Supabase 사본, 다른 기기의 값은 기준이 아니다)
+        syncVersion: action.origin === 'hub' ? action.session.syncVersion : null,
       };
       const revision = state.revision + 1;
       let next: AppState = {
@@ -263,6 +273,7 @@ export function reducer(state: AppState, action: Action): AppState {
         pendingRemovedIds: [],
         revision,
         cloudRevision: action.origin === 'cloud' ? revision : state.cloudRevision,
+        hubRevision: action.origin === 'hub' ? revision : state.hubRevision,
       };
       if (!canEnter(next.phase, session)) next.phase = 'import';
       if (next.phase === 'sort') next = withPair(next);
@@ -300,6 +311,7 @@ export function reducer(state: AppState, action: Action): AppState {
         user: state.user,
         revision: state.revision + 1,
         cloudRevision: state.cloudRevision,
+        hubRevision: state.hubRevision,
       };
 
     case 'setPhase': {
@@ -468,6 +480,19 @@ export function reducer(state: AppState, action: Action): AppState {
         session: { ...state.session, syncedAt: action.savedAt },
         cloudRevision: Math.max(state.cloudRevision, action.revision),
       };
+
+    case 'hubSaved': {
+      // 업로드 자체는 새 변경이 아니므로 revision은 올리지 않는다
+      const hubRevision = Math.max(state.hubRevision, action.revision);
+      return state.session.syncVersion === action.version
+        ? { ...state, hubRevision }
+        : { ...state, session: { ...state.session, syncVersion: action.version }, hubRevision };
+    }
+
+    case 'hubBase':
+      return state.session.syncVersion === action.version
+        ? state
+        : { ...state, session: { ...state.session, syncVersion: action.version } };
 
     case 'markDirty':
       return { ...state, revision: state.revision + 1 };

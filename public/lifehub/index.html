@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>ELO Sorter · Life Hub</title>
+</head>
+<body>
+<p>Life Hub 연결을 마무리하는 중…</p>
+<script>
+  // Life Hub가 이 주소로 돌려보낸다. 일회용 결과(?code=…&state=…)를 이 탭의 sessionStorage로 넘기고,
+  // 주소창에서는 지운 채 앱으로 돌아간다. 토큰 교환은 앱(src/services/lifehub/remote.ts)이 한다.
+  try { sessionStorage.setItem('elo:lifehub.callback.v1', location.search); } catch (e) { /* 앱이 알려 준다 */ }
+  location.replace(new URL('../', location.href).href);
+</script>
+</body>
+</html>

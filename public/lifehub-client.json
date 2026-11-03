@@ -1,0 +1,9 @@
+{
+  "client_id": "https://kingjnu-sakayume.github.io/elosorter/lifehub-client.json",
+  "client_name": "ELO Sorter",
+  "client_uri": "https://kingjnu-sakayume.github.io/elosorter/",
+  "redirect_uris": ["https://kingjnu-sakayume.github.io/elosorter/lifehub/"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}

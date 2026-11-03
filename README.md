@@ -12,7 +12,7 @@ Spotify 좋아요 곡·플레이리스트를 **티어 분류 → 1:1 비교**로
 3. **티어 분류** — 곡마다 직감으로 Tier 1(최애)·2(선호)·3(보통). 권장 비율(10/40/50)은 가이드일 뿐이며, 실제로 나눈 비율에 맞춰 시작 점수가 자동으로 조정됩니다. 곡에 1초 머물면 자동 재생되고, 빠르게 넘기는 동안에는 재생 요청을 보내지 않습니다.
 4. **비교 정렬** — 두 곡 중 더 좋은 쪽을 5단계로 고릅니다. 레이팅이 가까운 곡끼리, 티어 경계를 넘어서도 비교합니다. "상위권 집중"을 켜면 Top 10을 먼저 확정합니다.
 5. **랭킹** — 예상 정확도, 곡별 불확실성(±), 검색·필터, 티어 변경, CSV 내보내기.
-6. **동기화·백업** — Spotify에서 추가·삭제된 곡 반영, Supabase 자동 백업, JSON 백업 파일.
+6. **동기화·백업** — Spotify에서 추가·삭제된 곡 반영, Life Hub 기기 동기화, JSON 백업 파일. (Supabase 자동 백업은 Life Hub로 옮기는 중이며 Life Hub P6 계획의 5단계에서 정리 예정)
 
 로그인하지 않아도 이 브라우저에 저장된 세션으로 비교·랭킹은 계속할 수 있습니다(재생만 불가).
 
@@ -56,7 +56,19 @@ Spotify 좋아요 곡·플레이리스트를 **티어 분류 → 1:1 비교**로
 
 Supabase를 비워 두면 세션은 브라우저(localStorage)와 백업 파일로만 보관됩니다.
 
-### Supabase 테이블
+### Life Hub 기기 동기화
+
+여러 기기에서 같은 세션을 이어서 하도록, 세션을 내 [Life Hub](https://github.com/KINGJNU-sakayume/life-hub)의 비공개 저장소(`/elosorter/v1/sync`)에 보관합니다. 설계와 API는 life-hub의 `docs/P6_SYNC.md`가 계약입니다.
+
+- **연결**: 설정 → "Life Hub 연결". OAuth(Open Authorization, 개방형 인증) + PKCE(Proof Key for Code Exchange, 코드 교환 증명 키) 공개 클라이언트이고, scope는 `elosorter:sync` 하나입니다. 클라이언트 식별 문서는 `public/lifehub-client.json`, 돌아오는 주소는 `public/lifehub/`입니다. 두 파일은 배포 주소(`https://kingjnu-sakayume.github.io/elosorter/`, vite `base`와 같음)에 묶여 있어 그 주소에서만 연결됩니다. Life Hub 쪽에는 배포 변수 `HUB_ELOSORTER_REDIRECT_URI`가 필요합니다.
+- **토큰**: Spotify 토큰(`elo:spotify_*`)과 별도로 `localStorage`의 `elo:lifehub.*`에 저장됩니다. 위 "토큰 저장 방식"의 주의가 그대로 적용됩니다.
+- **동기화 문서**: 압축하지 않은 JSON. 저장·백업 파일과 같은 형식에서, 앱이 불러올 때 다시 계산하는 곡의 `rating`·`sigma`만 뺍니다(`src/core/session/syncDoc.ts`). 크기는 설정 화면의 "동기화 문서 크기 / 한도"로 보이며, **900 KiB**(921,600바이트)를 넘으면 자동 동기화를 하지 않고 "너무 큼"으로 안내합니다. 잘라 내거나 일부만 올리지 않습니다.
+- **충돌**: 세션의 `syncVersion`(이 기기 사본이 기반한 서버 version)으로 판단합니다. 쓰기는 `If-Match`로 하고, 서버 version이 다르면 자동으로 올리지 않고 "클라우드 것 쓰기 / 이 기기로 덮어쓰기"를 묻습니다. 클라우드 것을 쓰기 전의 이 기기 세션은 파일로 내려받을 수 있게 남겨 둡니다.
+- **시점**: 앱 시작과 탭이 다시 보일 때 서버를 확인하고(폴링 없음), 변경 10개마다 또는 마지막 변경 15초 뒤에 올립니다(Supabase 백업과 같은 규칙).
+- **Supabase와의 관계**: Life Hub 동기화가 켜져 있고 한 번이라도 쓰기에 성공하면 그 뒤로 Supabase `elo_state`에는 쓰지 않습니다(읽기는 남음). **동기화를 끄면 Supabase 백업으로 돌아갑니다.** JSON 백업 파일은 언제나 그대로 쓸 수 있습니다.
+- 세션 내용은 공개 저장소·로그·오류 메시지에 들어가지 않습니다. 오류에는 상태 코드와 고정 문구만 보입니다.
+
+### Supabase 테이블 (5단계에서 정리 예정)
 
 ```sql
 create table elo_state (
