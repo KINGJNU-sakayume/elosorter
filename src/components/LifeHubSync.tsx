@@ -7,8 +7,6 @@ import { exportBackup } from '../services/download';
 import { useAppState, useSave, useToast } from '../state/context';
 import { fmtCount, fmtDateTime } from '../lib/format';
 import { useLoggedIn } from '../hooks/useAuth';
-import { useConfig } from '../hooks/useConfig';
-import { isCloudConfigured } from '../services/config';
 import Button from './ui/Button';
 import { useConfirm } from './ui/confirm';
 import SyncSize from './SyncSize';
@@ -65,7 +63,6 @@ export default function LifeHubSync() {
   const toast = useToast();
   const confirm = useConfirm();
   const loggedIn = useLoggedIn();
-  const cfg = useConfig();
   const [busy, setBusy] = useState<'load' | 'overwrite' | 'sync' | null>(null);
   const [replaced, setReplaced] = useState(hasReplacedSession);
   const [labelDraft, setLabelDraft] = useState<string | null>(null);
@@ -77,16 +74,8 @@ export default function LifeHubSync() {
   const toggle = async () => {
     if (snap.enabled) {
       await hub.engine.setEnabled(false);
-      toast(isCloudConfigured(cfg) ? 'Life Hub 동기화를 껐습니다. Supabase 백업으로 돌아갑니다' : 'Life Hub 동기화를 껐습니다');
+      toast('Life Hub 동기화를 껐습니다. 이제 이 기기와 백업 파일에만 저장됩니다');
       return;
-    }
-    if (isCloudConfigured(cfg)) {
-      const ok = await confirm({
-        title: 'Life Hub 동기화를 켤까요?',
-        message: '첫 저장이 성공하면 이 앱은 Supabase에는 더 이상 쓰지 않습니다 (읽기는 남습니다). 동기화를 끄면 Supabase 백업으로 돌아갑니다. 백업 파일은 언제든 쓸 수 있습니다.',
-        confirmLabel: '켜기',
-      });
-      if (!ok) return;
     }
     void hub.engine.setEnabled(true);
   };
@@ -155,7 +144,7 @@ export default function LifeHubSync() {
       </div>
       <p className="text-xs leading-relaxed text-fg-2">
         여러 기기에서 같은 세션을 이어서 하도록 내 Life Hub의 비공개 저장소에 세션을 보관합니다. 이 기기의 저장이 먼저이고,
-        동기화에 실패해도 이 기기의 세션은 그대로입니다. 백업 파일은 그대로 쓸 수 있습니다.
+        동기화에 실패해도 이 기기의 세션은 그대로입니다. 동기화를 끄면 이 기기와 백업 파일에만 저장됩니다.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -165,7 +154,7 @@ export default function LifeHubSync() {
             <Button size="sm" variant="quiet" icon={Link2Off} onClick={async () => {
               const ok = await confirm({
                 title: 'Life Hub 연결을 끊을까요?',
-                message: '연결을 끊으면 동기화도 꺼지고 (Supabase를 설정했다면 그쪽 백업으로 돌아갑니다), 이 기기의 세션은 그대로 남습니다.',
+                message: '연결을 끊으면 동기화도 꺼집니다. 이 기기의 세션은 그대로 남고, 이후에는 이 기기와 백업 파일에만 저장됩니다.',
                 confirmLabel: '연결 끊기',
                 tone: 'danger',
               });
@@ -194,7 +183,7 @@ export default function LifeHubSync() {
       {snap.connected && !loggedIn && <p className="text-xs text-fg-2">Spotify에 로그인하면 동기화를 켤 수 있습니다 (세션 주인 확인에 쓰입니다).</p>}
       {needsReconnect && (
         <p role="alert" className="rounded-[10px] bg-warn-soft px-3.5 py-2.5 text-xs leading-relaxed text-warn">
-          동기화는 켜져 있지만 Life Hub 연결이 끊겼습니다. 다시 연결하거나 동기화를 끄세요. 연결이 없는 동안에는 Supabase에도 쓰지 않습니다.
+          동기화는 켜져 있지만 Life Hub 연결이 끊겼습니다. 다시 연결하거나 동기화를 끄세요. 이 기기에는 계속 저장됩니다.
         </p>
       )}
       {snap.detail && snap.status !== 'idle' && snap.status !== 'conflict' && (
@@ -268,12 +257,6 @@ export default function LifeHubSync() {
         />
         <p className="mt-1.5 text-xs leading-relaxed text-fg-2">충돌 안내에 어느 기기가 저장했는지 보여 주는 이름입니다. 영문·숫자·기호 40자까지, 비우면 기본 이름({snap.effectiveLabel})을 씁니다.</p>
       </div>
-
-      {save.writesStopped && (
-        <p className="text-xs leading-relaxed text-fg-2">
-          Life Hub 저장이 성공해서 Supabase에는 더 이상 쓰지 않습니다. 동기화를 끄면 Supabase 백업으로 돌아갑니다. (Supabase 항목은 5단계에서 정리 예정)
-        </p>
-      )}
     </section>
   );
 }

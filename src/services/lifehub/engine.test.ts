@@ -183,7 +183,7 @@ describe('412 → conflict', () => {
     const a = deviceWith(hub);
     await a.enable();
     await a.autoPush();
-    const b = new Device(hub, { session: { ...a.session, syncVersion: null, syncedAt: 'x' } });
+    const b = new Device(hub, { session: { ...a.session, syncVersion: null } });
     await b.enable();
     expect(b.status).toBe('idle');
     expect(b.session.syncVersion).toBe(1);

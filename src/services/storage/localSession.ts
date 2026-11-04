@@ -39,7 +39,7 @@ export function clearLocalSession(): void {
   localStorage.removeItem(V1_BACKUP_KEY);
 }
 
-/** 화면 상태(마지막 단계, 비교 범위) — 세션 데이터와 달리 클라우드로 보내지 않는다 */
+/** 화면 상태(마지막 단계, 비교 범위) — 세션 데이터와 달리 Life Hub로 보내지 않는다 */
 export function loadUiPrefs(): Record<string, unknown> {
   try {
     const v = JSON.parse(localStorage.getItem(UI_KEY) ?? '{}');

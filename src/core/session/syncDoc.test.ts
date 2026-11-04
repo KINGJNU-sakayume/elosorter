@@ -159,7 +159,7 @@ describe('syncContentKey', () => {
   const s = syntheticSession({ tracks: 20, matches: 30, seed: 4 });
 
   it('ignores save time and sync bookkeeping, and key order', () => {
-    const moved = { ...s, savedAt: '2030-01-01T00:00:00.000Z', syncedAt: 'x', syncVersion: 9 };
+    const moved = { ...s, savedAt: '2030-01-01T00:00:00.000Z', syncVersion: 9 };
     expect(syncContentKey(moved)).toBe(syncContentKey(s));
     const reordered = { ...s, tracks: s.tracks.map(t => Object.fromEntries(Object.entries(t).reverse()) as typeof t) };
     expect(syncContentKey(reordered)).toBe(syncContentKey(s));

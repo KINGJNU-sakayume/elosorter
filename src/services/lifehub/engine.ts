@@ -193,7 +193,7 @@ export function createHubEngine({ deps, host, userAgent = '' }: EngineOptions) {
 
   /**
    * 앞서 응답을 못 받은 쓰기(pending)가 서버에 반영됐는지 meta로 확인한다. 어느 쪽이든 pending은 비운다.
-   * 반영됐다면 그 쓰기는 성공이었으니 돌려준다 (Supabase 쓰기를 멈추는 조건인 everSucceeded도 켠다).
+   * 반영됐다면 그 쓰기는 성공이었으니 돌려준다 (everSucceeded도 켠다).
    */
   function takeLanded(meta: RemoteMeta | null): PendingWrite | null {
     const pending = state().pending;

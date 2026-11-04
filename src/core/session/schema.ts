@@ -1,5 +1,5 @@
 // 저장 형식(v2)과 파싱/검증/마이그레이션.
-// localStorage, Supabase, 백업 파일 어디서 온 데이터든 이 파일을 거쳐서만 앱 상태가 된다.
+// localStorage, Life Hub, 백업 파일 어디서 온 데이터든 이 파일을 거쳐서만 앱 상태가 된다.
 
 import { countTiers } from '../rating/engine';
 import { LEGACY_INITIAL_RATING, legacyPriorSd, tierPriors } from '../rating/priors';
@@ -26,19 +26,15 @@ export interface SessionData {
   /** 마지막 저장 시각 */
   savedAt: string | null;
   /**
-   * 이 세션이 마지막으로 맞춰진 클라우드 버전(savedAt).
-   * 클라우드의 savedAt이 이 값과 다르면 다른 기기에서 저장한 것이므로 자동 업로드를 멈춘다.
-   */
-  syncedAt: string | null;
-  /**
    * 이 기기의 사본이 기반한 Life Hub 서버 문서 version (동기화 문서 P6 6절).
    * null이면 아직 Life Hub와 맞춘 적이 없다. 업로드는 If-Match: "<syncVersion>"로 하고,
-   * 서버 version이 이 값과 다르면 다른 기기가 쓴 것이다. (Supabase 백업은 위의 savedAt·syncedAt을 그대로 쓴다.)
+   * 서버 version이 이 값과 다르면 다른 기기가 쓴 것이다.
+   * (P6 5단계 전 저장본에 남은 syncedAt — Supabase 백업의 기준점 — 은 parseSession이 읽지 않고 버린다.)
    */
   syncVersion: number | null;
 }
 
-/** 클라우드 목록/충돌 확인용 요약 (전체 데이터를 받지 않고 비교하려고 따로 저장) */
+/** 충돌 안내에 보여 줄 세션 요약 (Life Hub 문서와 이 기기 사본을 비교할 때) */
 export interface SessionSummary {
   trackCount: number;
   tieredCount: number;
@@ -163,7 +159,6 @@ export function migrateV1(raw: Obj): SessionData {
       : [],
     lastSyncedAt: null,
     savedAt: typeof raw.savedAt === 'string' ? raw.savedAt : null,
-    syncedAt: null,
     syncVersion: null,
   };
 }
@@ -192,7 +187,6 @@ export function parseSession(raw: unknown): SessionData | null {
       : [],
     lastSyncedAt: typeof raw.lastSyncedAt === 'string' ? raw.lastSyncedAt : null,
     savedAt: typeof raw.savedAt === 'string' ? raw.savedAt : null,
-    syncedAt: typeof raw.syncedAt === 'string' ? raw.syncedAt : null,
     syncVersion: typeof raw.syncVersion === 'number' && Number.isSafeInteger(raw.syncVersion) && raw.syncVersion >= 1
       ? raw.syncVersion
       : null,

@@ -23,7 +23,7 @@ const TOKENS_KEY = 'elo:lifehub.tokens.v1';
 /**
  * Life Hub 기기 동기화. 판단은 services/lifehub/engine.ts가 하고, 여기서는 앱 상태와 이어 붙이고 시점만 정한다:
  *  - 앱 시작·탭이 다시 보일 때 서버 meta를 확인한다 (폴링 없음).
- *  - 변경 10개마다, 또는 마지막 변경 15초 뒤에 올린다. 오류로 멈췄던 것은 30초 뒤에 다시 (savePolicy.ts, Supabase와 같은 규칙).
+ *  - 변경 10개마다, 또는 마지막 변경 15초 뒤에 올린다. 오류로 멈췄던 것은 30초 뒤에 다시 (savePolicy.ts).
  *  - 탭이 숨겨질 때 남은 변경을 바로 올려 본다.
  */
 export function useLifeHubSync({ state, dispatch, flushLocal, toast }: Options): HubInfo {
@@ -108,7 +108,7 @@ export function useLifeHubSync({ state, dispatch, flushLocal, toast }: Options):
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [ready, engine, latest]);
 
-  // 변경 뒤 자동 업로드 (Supabase 백업과 같은 시점 규칙). 충돌·오류·권한 없음에서는 예약하지 않는다.
+  // 변경 뒤 자동 업로드 (savePolicy.ts의 시점 규칙). 충돌·오류·권한 없음에서는 예약하지 않는다.
   // '너무 큼'은 예약한다: 이 기기의 문서 크기는 시도할 때마다 다시 재서(요청 없이), 곡을 줄여 한도 아래가 되면 저절로 풀린다.
   // (서버가 413을 준 경우는 엔진이 건너뛴다: 수동 "지금 동기화"로만 푼다.)
   const status = snapshot.status;

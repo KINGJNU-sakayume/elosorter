@@ -3,11 +3,11 @@ import { newSeed } from '../core/rating/rng';
 import { loadLocalSession, loadUiPrefs, saveUiPrefs } from '../services/storage/localSession';
 import Toast, { type ToastMessage } from '../components/Toast';
 import {
-  AppDispatchContext, AppStateContext, SaveContext, ToastContext, type CloudStatus, type SaveInfo, type ToastTone,
+  AppDispatchContext, AppStateContext, SaveContext, ToastContext, type SaveInfo, type ToastTone,
 } from './context';
 import { createInitialState, reducer } from './reducer';
-import { supabaseWritesAllowed } from './savePolicy';
-import { useCloudSync } from './useCloudSync';
+import { useLoggedIn } from '../hooks/useAuth';
+import { primaryStatus } from './saveStatus';
 import { useLifeHubSync } from './useLifeHubSync';
 import { useLocalPersistence } from './useLocalPersistence';
 
@@ -27,27 +27,19 @@ export default function AppProvider({ children }: { children: ReactNode }) {
 
   const local = useLocalPersistence(state.session);
   const hub = useLifeHubSync({ state, dispatch, flushLocal: local.flush, toast: showToast });
-  // Life Hub 동기화가 켜져 있고 쓰기가 한 번이라도 성공했으면 Supabase에는 더 이상 쓰지 않는다. 끄면 다시 쓴다 (롤백).
-  const supabase = useCloudSync({
-    writesAllowed: supabaseWritesAllowed(hub.snapshot),
-    state,
-    dispatch,
-    flushLocal: local.flush,
+  const loggedIn = useLoggedIn();
+  // 저장 위치: 이 기기(항상) + Life Hub(동기화를 켰을 때). 동기화가 꺼져 있으면 이 기기와 JSON 백업 파일만 쓴다.
+  const save: SaveInfo = {
+    hub,
     localSavedAt: local.savedAt,
     localError: local.error,
-  });
-
-  const snap = hub.snapshot;
-  const hubShown = snap.enabled;
-  const primary: SaveInfo['primary'] = hubShown
-    ? {
-        cloud: !snap.connected ? 'disconnected' : (snap.status === 'off' ? 'off' : snap.status) as CloudStatus,
-        unsaved: hub.unsaved,
-        lastSaveAt: hub.lastSaveAt,
-        saveNow: async () => (await hub.engine.push('manual')) === 'ok',
-      }
-    : { cloud: supabase.cloud, unsaved: supabase.unsaved, lastSaveAt: supabase.lastCloudSaveAt, saveNow: supabase.saveNow };
-  const save: SaveInfo = { ...supabase, hub, primary };
+    primary: {
+      cloud: primaryStatus(hub.snapshot, loggedIn),
+      unsaved: hub.unsaved,
+      lastSaveAt: hub.lastSaveAt,
+      saveNow: async () => (await hub.engine.push('manual')) === 'ok',
+    },
+  };
 
   useEffect(() => {
     saveUiPrefs({ phase: state.phase, focus: state.focus });

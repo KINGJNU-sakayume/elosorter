@@ -34,7 +34,7 @@ export default function SyncSize() {
             {size.tooLarge && (
               <span className="mt-1 flex items-start gap-1.5 text-danger">
                 <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
-                너무 큼 — 한도를 넘어서 자동 동기화를 하지 않습니다. (JSON 백업 파일과 Supabase 백업은 그대로 쓸 수 있습니다.)
+                너무 큼 — 한도를 넘어서 자동 동기화를 하지 않습니다. (이 기기 저장과 JSON 백업 파일은 그대로 쓸 수 있습니다.)
               </span>
             )}
           </p>

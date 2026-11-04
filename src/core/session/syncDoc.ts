@@ -11,7 +11,7 @@
 // 값이 달라지는 필드가 생기면 그 필드는 여기서 빼지 않는다.
 //
 // 그 밖의 필드(uri·isNew·thumb 같은 기본값 생략은 serializeSession이 이미 한다)는 그대로 둔다.
-// savedAt·syncedAt·syncVersion도 남지만 문서를 받아 쓸 때 앱이 덮어쓴다 (이 기기 사본의 기준점이므로).
+// savedAt·syncVersion도 남지만 문서를 받아 쓸 때 앱이 덮어쓴다 (이 기기 사본의 기준점이므로).
 
 import { recomputeRatings } from '../rating/engine';
 import { parseSession, SESSION_VERSION, serializeSession, type SessionData } from './schema';
@@ -77,7 +77,7 @@ export function parseSyncDocument(raw: unknown): SessionData | null {
 // ── 내용 키: "보내지 않은 변경이 있는가" 판단용 ──────────────────────────────
 
 /** 이 기기 사본의 기준점이라 내용이 아닌 필드 (저장할 때마다 바뀔 수 있다) */
-const VOLATILE_FIELDS = ['savedAt', 'syncedAt', 'syncVersion'] as const;
+const VOLATILE_FIELDS = ['savedAt', 'syncVersion'] as const;
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;

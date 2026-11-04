@@ -6,7 +6,7 @@ import { errorMessage, fmtCount } from '../../lib/format';
 import { exportBackup, readBackup } from '../../services/download';
 import { useAppDispatch, useAppState, useToast } from '../../state/context';
 
-/** Supabase 없이도 기기 간 이동·보관이 가능하도록 JSON 백업 (백업 묶음의 한 줄) */
+/** Life Hub 연결 없이도 기기 간 이동·보관이 가능하도록 JSON 백업 (백업 묶음의 한 줄) */
 export default function FileBackup() {
   const { session } = useAppState();
   const dispatch = useAppDispatch();

@@ -19,8 +19,8 @@ export interface HubState {
   /** 이 기기에서 Life Hub 동기화를 켰는가 */
   enabled: boolean;
   /**
-   * Life Hub에 쓰기가 한 번이라도 성공했는가. enabled이면서 true이면 그 뒤로 Supabase elo_state에 쓰지 않는다.
-   * (읽기만 하거나 문서를 받아 온 것은 성공으로 치지 않는다: 쓰기 경로가 실제로 되는지 확인된 것이 아니므로.)
+   * Life Hub에 쓰기가 한 번이라도 성공했는가 (기록용. 4단계에서는 Supabase 쓰기를 멈추는 조건이었다).
+   * 읽기만 하거나 문서를 받아 온 것은 성공으로 치지 않는다: 쓰기 경로가 실제로 되는지 확인된 것이 아니므로.
    */
   everSucceeded: boolean;
   /** 마지막으로 맞춘 시각 (ms) */
@@ -67,12 +67,6 @@ export function updateState(storage: Deps['storage'], patch: Partial<HubState>):
   }
   return next;
 }
-
-/** Life Hub 동기화가 켜져 있고 쓰기가 한 번이라도 성공했는가 → Supabase elo_state에 쓰지 않는다 */
-export const stopsSupabaseWrites = (storage: Deps['storage']): boolean => {
-  const s = readState(storage);
-  return s.enabled && s.everSucceeded;
-};
 
 // ── 기기 이름 (X-Device-Label) ──────────────────────────────────────────
 
