@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultDeviceLabel, readState, sanitizeDeviceLabel, STATE_KEY, stopsSupabaseWrites, updateState } from './state';
+import { defaultDeviceLabel, readState, sanitizeDeviceLabel, STATE_KEY, updateState } from './state';
 import { memoryStorage } from './testing';
 
 describe('device label (X-Device-Label)', () => {
@@ -41,14 +41,12 @@ describe('persisted sync state', () => {
     );
   });
 
-  it('Supabase writes stop only while enabled and after a successful write', () => {
+  it('keeps a stored record from before Supabase was retired (everSucceeded) and reads it back unchanged', () => {
     const storage = memoryStorage();
-    expect(stopsSupabaseWrites(storage)).toBe(false);
-    updateState(storage, { enabled: true });
-    expect(stopsSupabaseWrites(storage)).toBe(false);
-    updateState(storage, { everSucceeded: true });
-    expect(stopsSupabaseWrites(storage)).toBe(true);
-    updateState(storage, { enabled: false });
-    expect(stopsSupabaseWrites(storage)).toBe(false);
+    storage.setItem(STATE_KEY, JSON.stringify({ enabled: false, everSucceeded: true, lastSyncAt: 5, syncedKey: 'k', deviceLabel: null, pending: null }));
+    const s = readState(storage);
+    expect(s.enabled).toBe(false);
+    expect(s.everSucceeded).toBe(true);
+    expect(updateState(storage, { enabled: true }).everSucceeded).toBe(true);
   });
 });

@@ -84,7 +84,7 @@ export default function SessionCard() {
             onClick={async () => {
               const ok = await confirm({
                 title: '이 세션을 삭제할까요?',
-                message: `${fmtCount(total)}곡의 티어와 비교 ${fmtCount(session.compCount)}회 기록이 이 브라우저에서 지워집니다. 클라우드 백업은 그대로 남습니다.`,
+                message: `${fmtCount(total)}곡의 티어와 비교 ${fmtCount(session.compCount)}회 기록이 이 브라우저에서 지워집니다. Life Hub에 있는 문서는 그대로 남습니다.`,
                 confirmLabel: '삭제',
                 tone: 'danger',
               });

@@ -85,7 +85,6 @@ export function syntheticSession({ tracks: n, matches: m = Math.min(n, 4000), se
     legacySeen: [],
     lastSyncedAt: '2026-01-01T00:00:00.000Z',
     savedAt: '2026-01-01T00:00:00.000Z',
-    syncedAt: null,
     syncVersion: null,
   };
 }

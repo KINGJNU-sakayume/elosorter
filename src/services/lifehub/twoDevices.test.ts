@@ -1,10 +1,9 @@
 // 두 기기 시나리오: 메모리 안 가짜 Life Hub(version·412·sha256) 하나에 기기 둘이 붙는다.
-// 기기마다 저장소(localStorage·sessionStorage), 리듀서, 엔진이 따로다. 실제 Life Hub·Supabase에는 요청하지 않는다.
+// 기기마다 저장소(localStorage·sessionStorage), 리듀서, 엔진이 따로다. 실제 Life Hub에는 요청하지 않는다.
 
 import { describe, expect, it } from 'vitest';
 import { parseSession, serializeSession, type SessionData } from '../../core/session/schema';
 import { parseSyncDocument, syncContentKey } from '../../core/session/syncDoc';
-import { supabaseWritesAllowed } from '../../state/savePolicy';
 import { Device, FakeHub, join, sessionWith } from './testing';
 
 const ratings = (s: SessionData) => s.tracks.map(t => [t.id, t.tier, t.rating, t.sigma, t.comparisons] as const);
@@ -165,46 +164,38 @@ describe('two devices', () => {
   });
 });
 
-describe('Supabase hand-over', () => {
-  it('Supabase keeps being written until the first Life Hub write succeeds, stops after, and resumes when sync is turned off', async () => {
+describe('turning sync off and on', () => {
+  it('records the first successful write; turning sync off stops uploads and turning it on resumes them', async () => {
     const hub = new FakeHub();
     const a = new Device(hub, { session: sessionWith(30, 20, 1) });
-    const writes = () => supabaseWritesAllowed(a.engine.getSnapshot());
-    expect(writes()).toBe(true); // 아직 켜지 않음
-
     await a.enable();
     expect(a.engine.getSnapshot().enabled).toBe(true);
-    expect(writes()).toBe(true); // 켰지만 아직 한 번도 성공하지 않았다
+    expect(a.engine.getSnapshot().everSucceeded).toBe(false);
 
-    // 실패만 하는 동안(너무 큼·권한 없음·네트워크)에는 계속 Supabase에 쓴다
+    // 실패(형식 오류·너무 큼)는 성공으로 치지 않는다
     hub.inject({ method: 'PUT', kind: 'status', status: 400 });
     expect(await a.autoPush()).toBe('error');
-    expect(writes()).toBe(true);
     hub.maxBytes = 100;
     await a.engine.syncNow();
     expect(a.status).toBe('too_large');
-    expect(writes()).toBe(true);
+    expect(a.engine.getSnapshot().everSucceeded).toBe(false);
     hub.maxBytes = 1_048_576;
 
     await a.engine.syncNow(); // 성공
     expect(a.engine.getSnapshot().everSucceeded).toBe(true);
-    expect(writes()).toBe(false); // 그 뒤로 Supabase에 쓰지 않는다
+    const versions = hub.versions.length;
 
-    // 이후 오류가 나도 다시 쓰기 시작하지 않는다 (끄지 않는 한)
-    a.play(1);
-    hub.inject({ method: 'PUT', kind: 'drop' });
-    hub.inject({ method: 'GET', path: 'meta', kind: 'drop' });
-    await a.autoPush();
-    expect(a.status).toBe('retry');
-    expect(writes()).toBe(false);
-
-    // 끄면 이전 동작(Supabase 백업)으로 돌아간다
+    // 끄면 이 기기에만 저장한다
     await a.engine.setEnabled(false);
     expect(a.status).toBe('off');
-    expect(writes()).toBe(true);
-    // 다시 켜면(이미 성공한 적이 있으므로) 곧바로 Supabase 쓰기가 멈춘다
+    a.play(2);
+    expect(await a.engine.push('auto')).toBe('skipped');
+    expect(hub.versions).toHaveLength(versions);
+
+    // 다시 켜면 꺼진 동안의 변경을 올린다
     await a.engine.setEnabled(true);
-    expect(writes()).toBe(false);
+    expect(await a.autoPush()).toBe('ok');
+    expect(hub.versions).toHaveLength(versions + 1);
   });
 
   it('turning sync off leaves the local session, the manual JSON backup and the cloud document alone', async () => {

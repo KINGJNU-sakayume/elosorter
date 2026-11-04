@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { autoSaveDelay, IDLE_MS, RETRY_MS, SAVE_EVERY, supabaseWritesAllowed } from './savePolicy';
+import { autoSaveDelay, IDLE_MS, RETRY_MS, SAVE_EVERY } from './savePolicy';
 
-describe('autoSaveDelay (the existing save policy, now shared with Life Hub)', () => {
+describe('autoSaveDelay (Life Hub auto upload)', () => {
   it('saves right away after SAVE_EVERY changes, else after the idle time', () => {
     expect(SAVE_EVERY).toBe(10);
     expect(IDLE_MS).toBe(15_000);
@@ -19,14 +19,5 @@ describe('autoSaveDelay (the existing save policy, now shared with Life Hub)', (
   it('does nothing when it cannot save or has nothing to save', () => {
     expect(autoSaveDelay({ canSave: false, unsaved: 12, failed: false })).toBeNull();
     expect(autoSaveDelay({ canSave: true, unsaved: 0, failed: false })).toBeNull();
-  });
-});
-
-describe('supabaseWritesAllowed', () => {
-  it('stops only when Life Hub sync is on AND has succeeded at least once', () => {
-    expect(supabaseWritesAllowed({ enabled: false, everSucceeded: false })).toBe(true);
-    expect(supabaseWritesAllowed({ enabled: true, everSucceeded: false })).toBe(true);
-    expect(supabaseWritesAllowed({ enabled: true, everSucceeded: true })).toBe(false);
-    expect(supabaseWritesAllowed({ enabled: false, everSucceeded: true })).toBe(true); // 끄면 롤백
   });
 });

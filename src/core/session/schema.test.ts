@@ -86,6 +86,23 @@ describe('parseSession', () => {
     expect(s.source).toBeNull();
   });
 
+  it('loads a session saved before Supabase was retired (syncedAt, summary) and drops those fields', () => {
+    const migrated = parseSession(v1Session)!;
+    const old = {
+      ...serializeSession({ ...migrated, ownerId: 'user1', savedAt: '2026-11-01T00:00:00.000Z', syncVersion: 4 }),
+      syncedAt: '2026-10-31T00:00:00.000Z',
+      summary: { trackCount: 9, tieredCount: 8, compCount: 20, source: 'liked', sourceName: null, savedAt: null },
+    };
+    const s = parseSession(JSON.parse(JSON.stringify(old)))!;
+    expect(s.tracks).toHaveLength(9);
+    expect(s.ownerId).toBe('user1');
+    expect(s.syncVersion).toBe(4);
+    expect(s.savedAt).toBe('2026-11-01T00:00:00.000Z');
+    expect('syncedAt' in s).toBe(false);
+    expect('summary' in s).toBe(false);
+    expect('syncedAt' in serializeSession(s)).toBe(false);
+  });
+
   it('rejects unknown shapes and versions', () => {
     expect(parseSession(null)).toBeNull();
     expect(parseSession('text')).toBeNull();

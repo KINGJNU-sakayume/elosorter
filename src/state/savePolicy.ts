@@ -1,4 +1,4 @@
-// 자동 저장 시점 정책. Supabase 백업과 Life Hub 동기화가 같은 규칙을 쓴다.
+// Life Hub 동기화의 자동 업로드 시점 정책.
 
 /** 이만큼 변경이 쌓이면 바로 업로드, 아니면 마지막 변경 후 IDLE_MS 뒤에 업로드 */
 export const SAVE_EVERY = 10;
@@ -11,9 +11,3 @@ export function autoSaveDelay({ canSave, unsaved, failed }: { canSave: boolean; 
   if (!canSave || unsaved <= 0) return null;
   return failed ? RETRY_MS : unsaved >= SAVE_EVERY ? 0 : IDLE_MS;
 }
-
-/**
- * Supabase elo_state에 써도 되는가. Life Hub 동기화가 켜져 있고 쓰기가 한 번이라도 성공했으면 그 뒤로 쓰지 않는다.
- * 동기화를 끄면 다시 쓴다 (이것이 롤백 경로다). 읽기는 이 규칙과 무관하게 남는다 (5단계의 일회성 복사용).
- */
-export const supabaseWritesAllowed = (hub: { enabled: boolean; everSucceeded: boolean }): boolean => !(hub.enabled && hub.everSucceeded);

@@ -188,24 +188,13 @@ describe('sync', () => {
   });
 });
 
-describe('cloud bookkeeping', () => {
-  it('marks a cloud load as synced and a file import as unsynced', () => {
+describe('file import bookkeeping', () => {
+  it('counts a file import as a new change that Life Hub has not seen yet', () => {
     const s = sortedSession();
-    const cloudCopy = { ...s.session, savedAt: '2026-02-02T00:00:00.000Z' };
-    const fromCloud = reducer(s, { type: 'hydrate', session: cloudCopy, origin: 'cloud' });
-    expect(fromCloud.cloudRevision).toBe(fromCloud.revision);
-    expect(fromCloud.session.syncedAt).toBe('2026-02-02T00:00:00.000Z');
-    const fromFile = reducer(s, { type: 'hydrate', session: s.session, origin: 'file' });
-    expect(fromFile.cloudRevision).toBeLessThan(fromFile.revision);
-    expect(fromFile.session.syncedAt).toBeNull();
-  });
-
-  it('records the synced cloud version without creating a new change', () => {
-    const s = sortedSession();
-    const saved = reducer(s, { type: 'cloudSaved', revision: s.revision, savedAt: '2026-03-03T00:00:00.000Z' });
-    expect(saved.revision).toBe(s.revision);
-    expect(saved.cloudRevision).toBe(s.revision);
-    expect(saved.session.syncedAt).toBe('2026-03-03T00:00:00.000Z');
+    const fromFile = reducer(s, { type: 'hydrate', session: { ...s.session, syncVersion: 3 }, origin: 'file' });
+    expect(fromFile.revision).toBe(s.revision + 1);
+    expect(fromFile.hubRevision).toBeLessThan(fromFile.revision);
+    expect(fromFile.session.syncVersion).toBeNull();
   });
 });
 
@@ -222,12 +211,11 @@ describe('enrichDurations', () => {
 });
 
 describe('Life Hub bookkeeping', () => {
-  it('counts Life Hub saves apart from Supabase and never creates a change by itself', () => {
+  it('records Life Hub saves without creating a change by itself', () => {
     const s = sortedSession();
     const saved = reducer(s, { type: 'hubSaved', revision: s.revision, version: 3 });
     expect(saved.revision).toBe(s.revision);
     expect(saved.hubRevision).toBe(s.revision);
-    expect(saved.cloudRevision).toBe(s.cloudRevision); // Supabase 쪽 저장 상태를 가리지 않는다
     expect(saved.session.syncVersion).toBe(3);
     // 이미 같은 version이면 세션 객체를 바꾸지 않는다 (불필요한 로컬 저장을 막는다)
     const again = reducer(saved, { type: 'hubSaved', revision: s.revision, version: 3 });
@@ -243,10 +231,8 @@ describe('Life Hub bookkeeping', () => {
     const fromHub = reducer(s, { type: 'hydrate', session: copy, origin: 'hub' });
     expect(fromHub.session.syncVersion).toBe(7);
     expect(fromHub.hubRevision).toBe(fromHub.revision);
-    expect(fromHub.session.syncedAt).toBeNull();
-    // 파일·Supabase 사본에 들어 있는 다른 기기의 version은 이 기기의 기준이 아니다
+    // 파일 사본에 들어 있는 다른 기기의 version은 이 기기의 기준이 아니다
     expect(reducer(s, { type: 'hydrate', session: copy, origin: 'file' }).session.syncVersion).toBeNull();
-    expect(reducer(s, { type: 'hydrate', session: copy, origin: 'cloud' }).session.syncVersion).toBeNull();
     expect(reducer(s, { type: 'hydrate', session: copy, origin: 'file' }).hubRevision).toBeLessThan(fromHub.hubRevision);
   });
 

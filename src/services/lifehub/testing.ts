@@ -1,5 +1,5 @@
 // 테스트 전용 도구: 메모리 안 가짜 Life Hub 서버, 저장소, 가짜 기기. 합성 데이터와 fetch 모킹만 쓴다 —
-// 실제 Life Hub·Supabase에는 요청하지 않는다. 앱 코드에서는 가져오지 않는다.
+// 실제 Life Hub에는 요청하지 않는다. 앱 코드에서는 가져오지 않는다.
 //
 // FakeHub는 life-hub의 src/sync/api.js·store.js 동작을 따른다 (docs/P6_SYNC.md 5절):
 // version은 쓰기마다 정확히 1 증가, If-Match/If-None-Match 필수(428), 412 본문에 current meta(없으면 null),
