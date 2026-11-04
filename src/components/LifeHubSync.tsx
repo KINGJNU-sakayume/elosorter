@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CloudDownload, CloudUpload, FileDown, Link2, Link2Off, RefreshCw, Trash2 } from 'lucide-react';
-import type { HubStatus, RemoteInfo } from '../services/lifehub/engine';
-import { APP_URL } from '../services/lifehub/remote';
+import type { SessionData } from '../core/session/schema';
+import type { HubSnapshot, RemoteInfo } from '../services/lifehub/engine';
 import { clearReplacedSession, hasReplacedSession, loadReplacedSession } from '../services/storage/localSession';
 import { exportBackup } from '../services/download';
 import { useAppState, useSave, useToast } from '../state/context';
@@ -10,33 +10,42 @@ import { useLoggedIn } from '../hooks/useAuth';
 import Button from './ui/Button';
 import { useConfirm } from './ui/confirm';
 import SyncSize from './SyncSize';
-
-const STATUS_LABEL: Record<HubStatus, string> = {
-  off: '꺼짐',
-  idle: '켜짐',
-  saving: '저장 중',
-  conflict: '충돌',
-  blocked: '차단',
-  error: '오류',
-  forbidden: '권한 없음',
-  retry: '나중에 재시도',
-  too_large: '너무 큼',
-};
-
-const STATUS_TONE: Record<HubStatus, string> = {
-  off: 'bg-sub text-fg-2',
-  idle: 'bg-accent-soft text-accent',
-  saving: 'bg-sub text-fg-2',
-  conflict: 'bg-warn-soft text-warn',
-  blocked: 'bg-warn-soft text-warn',
-  error: 'bg-danger-soft text-danger',
-  forbidden: 'bg-warn-soft text-warn',
-  retry: 'bg-warn-soft text-warn',
-  too_large: 'bg-danger-soft text-danger',
-};
+import { LIFEHUB_SECTION_ID, lifeHubView, type LifeHubView } from './lifeHubView';
 
 const inputCls =
   'h-10 w-full rounded-[10px] bg-sub px-3 text-sm text-fg placeholder:text-fg-2 focus:ring-2 focus:ring-accent-line focus:outline-none';
+
+function StatusDot({ dot }: { dot: LifeHubView['dot'] }) {
+  if (!dot) return null;
+  return <span aria-hidden className={`inline-block size-2 shrink-0 rounded-full ${dot === 'warn' ? 'bg-warn' : 'bg-accent'}`} />;
+}
+
+function StatusLine({ view }: { view: LifeHubView }) {
+  return (
+    <p role="status" className="flex items-center gap-2 text-[13px]">
+      <StatusDot dot={view.dot} />
+      <span className={view.kind === 'C' ? 'font-semibold text-warn' : ''}>{view.line}</span>
+    </p>
+  );
+}
+
+/** 불러오기 화면 백업 칸의 한 줄 요약: 상태 줄과 같은 문구 + 오른쪽 끝 「설정」 */
+export function LifeHubStatusLine({ view, onOpenSettings }: { view: LifeHubView; onOpenSettings: () => void }) {
+  return (
+    <div className="flex items-center gap-2 text-[13px]">
+      <StatusDot dot={view.dot} />
+      <span className={`min-w-0 flex-1 ${view.kind === 'C' ? 'font-semibold text-warn' : view.kind === 'A' ? 'text-fg-2' : ''}`}>
+        {view.line}
+      </span>
+      <span className="shrink-0">
+        <span className="text-fg-2">· </span>
+        <button type="button" onClick={onOpenSettings} className="font-semibold text-accent underline-offset-2 hover:underline">
+          설정
+        </button>
+      </span>
+    </div>
+  );
+}
 
 function RemoteSummary({ info, title }: { info: RemoteInfo; title: string }) {
   const s = info.summary;
@@ -51,38 +60,212 @@ function RemoteSummary({ info, title }: { info: RemoteInfo; title: string }) {
   );
 }
 
+type Busy = 'load' | 'overwrite' | 'sync' | null;
+
+export interface LifeHubPanelProps {
+  view: LifeHubView;
+  snap: HubSnapshot;
+  session: SessionData;
+  loggedIn: boolean;
+  connectAvailable: boolean;
+  replaced: boolean;
+  busy: Busy;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onSync: () => void;
+  onLoadCloud: () => void;
+  onOverwrite: () => void;
+  onDeviceLabel: (label: string) => void;
+  onDownloadReplaced: () => void;
+  onClearReplaced: () => void;
+}
+
+/** 원인별 경고 상자 문장 (C). 연결 끊김·권한 없음은 공통 규격 문구, 나머지는 기존 안내 */
+const CAUSE_TEXT = {
+  disconnected: 'Life Hub 연결이 끊겼습니다. 다시 연결해 주세요. 이 기기의 기록은 그대로입니다.',
+  forbidden: '동기화 권한이 없는 연결입니다. 한 번 다시 연결하면 제안과 동기화가 함께 켜집니다.',
+} as const;
+
+/** 설정의 「Life Hub」 섹션 화면 (컨텍스트 없이 그린다) */
+export function LifeHubPanel(p: LifeHubPanelProps) {
+  const { view, snap, session } = p;
+  const [labelDraft, setLabelDraft] = useState<string | null>(null);
+  const hasLocal = session.tracks.length > 0;
+  const syncing = p.busy === 'sync' || snap.status === 'saving';
+  const serverVersion = (snap.conflict ?? snap.remote)?.version ?? session.syncVersion;
+
+  const disconnectButton = (
+    <Button size="sm" icon={Link2Off} onClick={p.onDisconnect}>연결 해제</Button>
+  );
+  const reconnectButton = (
+    <Button size="sm" variant="primary" icon={Link2} disabled={!p.connectAvailable} onClick={p.onConnect}>다시 연결</Button>
+  );
+  const notDeployed = !p.connectAvailable && (
+    <p className="text-xs leading-relaxed text-fg-2">배포된 주소에서만 연결할 수 있어요.</p>
+  );
+
+  const advanced = (
+    <details className="rounded-xl border border-line">
+      <summary className="cursor-pointer px-3.5 py-2.5 text-[13px] font-semibold select-none">고급</summary>
+      <div className="space-y-4 px-3.5 pb-3.5">
+        <div>
+          <label htmlFor="hub-device" className="mb-1.5 block text-[13px] font-semibold">
+            이 기기 이름 <span className="font-normal text-fg-2">(선택)</span>
+          </label>
+          <input
+            id="hub-device"
+            className={inputCls}
+            value={labelDraft ?? snap.deviceLabel ?? ''}
+            maxLength={40}
+            placeholder={snap.effectiveLabel}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={e => setLabelDraft(e.target.value)}
+            onBlur={() => { if (labelDraft !== null) { p.onDeviceLabel(labelDraft); setLabelDraft(null); } }}
+          />
+          <p className="mt-1.5 text-xs leading-relaxed text-fg-2">충돌 안내에 어느 기기가 저장했는지 보여 주는 이름입니다. 영문·숫자·기호 40자까지, 비우면 기본 이름({snap.effectiveLabel})을 씁니다.</p>
+        </div>
+        {serverVersion != null && <p className="text-[13px] tabular-nums">서버 버전 {serverVersion}</p>}
+        <SyncSize />
+        {p.replaced && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-sub p-3">
+            <p className="min-w-0 flex-1 text-xs leading-relaxed">Life Hub의 버전으로 바꾸기 전의 이 기기 세션이 백업으로 남아 있습니다.</p>
+            <Button size="sm" icon={FileDown} onClick={p.onDownloadReplaced}>내려받기</Button>
+            <Button size="sm" variant="quiet" icon={Trash2} onClick={p.onClearReplaced}>지우기</Button>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+
+  let body;
+  if (view.kind === 'A') {
+    body = (
+      <>
+        <p className="text-xs leading-relaxed text-fg-2">이 앱의 세션을 다른 기기와 맞춥니다.</p>
+        <div>
+          <Button size="sm" variant="primary" icon={Link2} disabled={!p.connectAvailable} onClick={p.onConnect}>Life Hub 연결</Button>
+        </div>
+        {notDeployed}
+      </>
+    );
+  } else if (view.kind === 'B') {
+    body = (
+      <>
+        <StatusLine view={view} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" icon={RefreshCw} loading={syncing} disabled={!p.loggedIn} onClick={p.onSync}>지금 동기화</Button>
+          {disconnectButton}
+        </div>
+        {snap.remote && (
+          <div className="rounded-xl bg-accent-soft p-3.5">
+            <p className="text-[13px] font-semibold">Life Hub에 더 새 버전이 있습니다</p>
+            <RemoteSummary info={snap.remote} title="Life Hub" />
+            <p className="mt-1 text-xs text-fg-2">이 기기에는 보내지 않은 변경이 없습니다. 자동으로 바꾸지 않으니 필요할 때 불러오세요.</p>
+            <div className="mt-3">
+              <Button size="sm" variant="primary" icon={CloudDownload} loading={p.busy === 'load'} onClick={p.onLoadCloud}>Life Hub 버전 쓰기</Button>
+            </div>
+          </div>
+        )}
+        {!snap.remote && snap.status === 'idle' && p.loggedIn && !hasLocal && (
+          <p className="text-xs text-fg-2">Life Hub에 아직 문서가 없고 이 기기에도 세션이 없습니다.</p>
+        )}
+        {advanced}
+      </>
+    );
+  } else {
+    let box;
+    switch (view.cause) {
+      case 'disconnected':
+      case 'forbidden':
+        box = (
+          <>
+            <p className="text-xs leading-relaxed">{CAUSE_TEXT[view.cause]}</p>
+            <div className="mt-3">{reconnectButton}</div>
+            {notDeployed && <div className="mt-2">{notDeployed}</div>}
+          </>
+        );
+        break;
+      case 'conflict':
+        box = snap.conflict && (
+          <>
+            <p className="text-[13px] font-semibold">Life Hub에 다른 버전이 있습니다</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-fg-2">
+              다른 기기에서 저장했거나 이 기기가 맞춘 적 없는 버전입니다. 자동 저장을 멈춰 두었습니다 — 어느 쪽을 쓸지 골라 주세요.
+            </p>
+            <RemoteSummary info={snap.conflict} title="Life Hub" />
+            <p className="mt-1 text-[13px] tabular-nums">
+              <span className="font-semibold">이 기기</span> {fmtCount(session.tracks.length)}곡 · 분류 {fmtCount(session.tracks.filter(t => t.tier !== null).length)} · 비교 {fmtCount(session.compCount)}회
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" variant="primary" icon={CloudDownload} loading={p.busy === 'load'} onClick={p.onLoadCloud}>Life Hub 버전 쓰기</Button>
+              <Button size="sm" variant="danger" icon={CloudUpload} loading={p.busy === 'overwrite'} onClick={p.onOverwrite}>이 기기 버전으로 덮어쓰기</Button>
+              <Button size="sm" variant="quiet" icon={FileDown} disabled={!hasLocal} onClick={() => exportBackup(session)}>이 기기 세션 내려받기</Button>
+            </div>
+          </>
+        );
+        break;
+      case 'error':
+        box = (
+          <>
+            <p className="text-xs leading-relaxed">{snap.detail}</p>
+            <div className="mt-3">
+              <Button size="sm" icon={RefreshCw} loading={syncing} onClick={p.onSync}>지금 동기화</Button>
+            </div>
+          </>
+        );
+        break;
+      default: // blocked, too_large: 기존 안내만
+        box = <p className="text-xs leading-relaxed">{snap.detail}</p>;
+    }
+    body = (
+      <>
+        <StatusLine view={view} />
+        <div role="alert" className="rounded-xl bg-warn-soft p-3.5">{box}</div>
+        <div>{disconnectButton}</div>
+        {snap.connected && advanced}
+      </>
+    );
+  }
+
+  return (
+    <section id={LIFEHUB_SECTION_ID} aria-labelledby="lifehub-title" className="scroll-mt-4 space-y-3">
+      <h3 id="lifehub-title" className="text-[15px] font-semibold">Life Hub</h3>
+      {body}
+    </section>
+  );
+}
+
 /**
- * Life Hub 동기화: 연결/해제, 켜기/끄기, 상태, 마지막 동기화, 문서 크기, 지금 동기화, 충돌 해결.
+ * 설정 모달의 「Life Hub」 섹션: 연결·해제, 상태, 지금 동기화, 충돌 해결, 고급(기기 이름·서버 버전·문서 크기).
+ * 앱에서 Life Hub 연결·해제 버튼은 여기에만 있다. 동기화를 켜고 끄는 스위치는 없다 (연결 + 로그인이면 켜짐).
  * 오류 문구에는 상태 코드와 고정 문구만 보인다 (세션 내용·토큰·응답 본문은 넣지 않는다).
  */
 export default function LifeHubSync() {
-  const save = useSave();
-  const { hub } = save;
+  const { hub } = useSave();
   const snap = hub.snapshot;
   const { session } = useAppState();
   const toast = useToast();
   const confirm = useConfirm();
   const loggedIn = useLoggedIn();
-  const [busy, setBusy] = useState<'load' | 'overwrite' | 'sync' | null>(null);
+  const [busy, setBusy] = useState<Busy>(null);
   const [replaced, setReplaced] = useState(hasReplacedSession);
-  const [labelDraft, setLabelDraft] = useState<string | null>(null);
-
+  const view = lifeHubView({ snap, loggedIn, unsaved: hub.unsaved });
   const hasLocal = session.tracks.length > 0;
-  const pending = snap.conflict ?? snap.remote;
-  const needsReconnect = snap.enabled && !snap.connected;
-
-  const toggle = async () => {
-    if (snap.enabled) {
-      await hub.engine.setEnabled(false);
-      toast('Life Hub 동기화를 껐습니다. 이제 이 기기와 백업 파일에만 저장됩니다');
-      return;
-    }
-    void hub.engine.setEnabled(true);
-  };
 
   const sync = async () => {
     setBusy('sync');
     try { await hub.syncNow(); } finally { setBusy(null); }
+  };
+
+  const disconnect = async () => {
+    const ok = await confirm({
+      title: 'Life Hub 연결을 끊을까요?',
+      message: '연결을 끊으면 동기화도 멈춥니다. 이 기기의 세션은 그대로 남고, 이후에는 이 기기와 백업 파일에만 저장됩니다.',
+      confirmLabel: '연결 끊기',
+      tone: 'danger',
+    });
+    if (ok) { hub.disconnect(); toast('Life Hub 연결을 끊었습니다'); }
   };
 
   const loadCloud = async () => {
@@ -90,7 +273,7 @@ export default function LifeHubSync() {
       const ok = await confirm({
         title: 'Life Hub의 버전으로 바꿀까요?',
         message: `이 기기의 세션(${fmtCount(session.tracks.length)}곡 · 비교 ${fmtCount(session.compCount)}회)이 Life Hub의 버전으로 바뀝니다. 받은 문서를 확인한 뒤에만 바꾸고, 바꾸기 전의 이 기기 세션은 백업으로 남겨 두어 파일로 내려받을 수 있습니다.`,
-        confirmLabel: '클라우드 것 쓰기',
+        confirmLabel: 'Life Hub 버전 쓰기',
       });
       if (!ok) return;
     }
@@ -126,137 +309,29 @@ export default function LifeHubSync() {
     }
   };
 
-  const downloadReplaced = () => {
-    const previous = loadReplacedSession();
-    if (previous) exportBackup(previous);
-  };
-
-  const label = snap.deviceLabel ?? '';
-
   return (
-    <section aria-label="Life Hub 동기화" className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[15px] font-semibold">Life Hub 동기화</h3>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_TONE[snap.status]}`} role="status">
-          {STATUS_LABEL[snap.status]}
-          {snap.status === 'idle' && hub.unsaved > 0 ? ` · 대기 ${hub.unsaved}` : ''}
-        </span>
-      </div>
-      <p className="text-xs leading-relaxed text-fg-2">
-        여러 기기에서 같은 세션을 이어서 하도록 내 Life Hub의 비공개 저장소에 세션을 보관합니다. 이 기기의 저장이 먼저이고,
-        동기화에 실패해도 이 기기의 세션은 그대로입니다. 동기화를 끄면 이 기기와 백업 파일에만 저장됩니다.
-      </p>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {snap.connected ? (
-          <>
-            <span className="text-[13px]">연결됨</span>
-            <Button size="sm" variant="quiet" icon={Link2Off} onClick={async () => {
-              const ok = await confirm({
-                title: 'Life Hub 연결을 끊을까요?',
-                message: '연결을 끊으면 동기화도 꺼집니다. 이 기기의 세션은 그대로 남고, 이후에는 이 기기와 백업 파일에만 저장됩니다.',
-                confirmLabel: '연결 끊기',
-                tone: 'danger',
-              });
-              if (ok) { hub.disconnect(); toast('Life Hub 연결을 끊었습니다'); }
-            }}>연결 해제</Button>
-          </>
-        ) : (
-          <>
-            <span className="text-[13px] text-fg-2">연결 안 됨</span>
-            <Button size="sm" variant="primary" icon={Link2} disabled={!hub.connectAvailable} onClick={() => void hub.connect()}>Life Hub 연결</Button>
-          </>
-        )}
-        <Button size="sm" variant={snap.enabled ? 'secondary' : 'primary'} disabled={!snap.connected || !loggedIn} onClick={() => void toggle()}>
-          {snap.enabled ? '동기화 끄기' : '동기화 켜기'}
-        </Button>
-        <Button size="sm" icon={RefreshCw} loading={busy === 'sync' || snap.status === 'saving'} disabled={!snap.enabled || !snap.connected || !loggedIn} onClick={() => void sync()}>
-          지금 동기화
-        </Button>
-      </div>
-
-      {!hub.connectAvailable && !snap.connected && (
-        <p className="text-xs leading-relaxed text-fg-2">
-          연결은 배포된 주소(<code className="font-mono break-all text-fg">{APP_URL}</code>)에서만 시작할 수 있습니다.
-        </p>
-      )}
-      {snap.connected && !loggedIn && <p className="text-xs text-fg-2">Spotify에 로그인하면 동기화를 켤 수 있습니다 (세션 주인 확인에 쓰입니다).</p>}
-      {needsReconnect && (
-        <p role="alert" className="rounded-[10px] bg-warn-soft px-3.5 py-2.5 text-xs leading-relaxed text-warn">
-          동기화는 켜져 있지만 Life Hub 연결이 끊겼습니다. 다시 연결하거나 동기화를 끄세요. 이 기기에는 계속 저장됩니다.
-        </p>
-      )}
-      {snap.detail && snap.status !== 'idle' && snap.status !== 'conflict' && (
-        <p role="alert" className="rounded-[10px] bg-sub px-3.5 py-2.5 text-xs leading-relaxed">{snap.detail}</p>
-      )}
-      {snap.enabled && (
-        <p className="text-xs text-fg-2">
-          마지막 동기화: {snap.lastSyncAt ? fmtDateTime(new Date(snap.lastSyncAt).toISOString()) : '아직 없음'}
-        </p>
-      )}
-
-      {snap.conflict && (
-        <div role="alert" className="rounded-xl bg-warn-soft p-3.5">
-          <p className="text-[13px] font-semibold">Life Hub에 다른 버전이 있습니다</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-fg-2">
-            다른 기기에서 저장했거나 이 기기가 맞춘 적 없는 버전입니다. 자동 저장을 멈춰 두었습니다 — 어느 쪽을 쓸지 골라 주세요.
-          </p>
-          <RemoteSummary info={snap.conflict} title="Life Hub" />
-          <p className="mt-1 text-[13px] tabular-nums">
-            <span className="font-semibold">이 기기</span> {fmtCount(session.tracks.length)}곡 · 분류 {fmtCount(session.tracks.filter(t => t.tier !== null).length)} · 비교 {fmtCount(session.compCount)}회
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" variant="primary" icon={CloudDownload} loading={busy === 'load'} onClick={() => void loadCloud()}>클라우드 것 쓰기</Button>
-            <Button size="sm" variant="danger" icon={CloudUpload} loading={busy === 'overwrite'} onClick={() => void overwrite()}>이 기기로 덮어쓰기</Button>
-            <Button size="sm" variant="quiet" icon={FileDown} disabled={!hasLocal} onClick={() => exportBackup(session)}>이 기기 세션 내려받기</Button>
-          </div>
-        </div>
-      )}
-
-      {!snap.conflict && snap.remote && (
-        <div className="rounded-xl bg-accent-soft p-3.5">
-          <p className="text-[13px] font-semibold">Life Hub에 더 새 버전이 있습니다</p>
-          <RemoteSummary info={snap.remote} title="Life Hub" />
-          <p className="mt-1 text-xs text-fg-2">이 기기에는 보내지 않은 변경이 없습니다. 자동으로 바꾸지 않으니 필요할 때 불러오세요.</p>
-          <div className="mt-3">
-            <Button size="sm" variant="primary" icon={CloudDownload} loading={busy === 'load'} onClick={() => void loadCloud()}>클라우드 것 쓰기</Button>
-          </div>
-        </div>
-      )}
-      {!pending && snap.status === 'idle' && snap.enabled && !hasLocal && (
-        <p className="text-xs text-fg-2">Life Hub에 아직 문서가 없고 이 기기에도 세션이 없습니다.</p>
-      )}
-
-      {replaced && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-sub p-3">
-          <p className="min-w-0 flex-1 text-xs leading-relaxed">Life Hub의 버전으로 바꾸기 전의 이 기기 세션이 백업으로 남아 있습니다.</p>
-          <Button size="sm" icon={FileDown} onClick={downloadReplaced}>내려받기</Button>
-          <Button size="sm" variant="quiet" icon={Trash2} onClick={async () => {
-            const ok = await confirm({ title: '남겨 둔 세션을 지울까요?', message: '파일로 내려받지 않았다면 되돌릴 수 없습니다.', confirmLabel: '지우기', tone: 'danger' });
-            if (ok) { clearReplacedSession(); setReplaced(false); }
-          }}>지우기</Button>
-        </div>
-      )}
-
-      <SyncSize />
-
-      <div>
-        <label htmlFor="hub-device" className="mb-1.5 block text-[13px] font-semibold">
-          이 기기 이름 <span className="font-normal text-fg-2">(선택)</span>
-        </label>
-        <input
-          id="hub-device"
-          className={inputCls}
-          value={labelDraft ?? label}
-          maxLength={40}
-          placeholder={snap.effectiveLabel}
-          autoComplete="off"
-          spellCheck={false}
-          onChange={e => setLabelDraft(e.target.value)}
-          onBlur={() => { if (labelDraft !== null) { hub.engine.setDeviceLabel(labelDraft); setLabelDraft(null); } }}
-        />
-        <p className="mt-1.5 text-xs leading-relaxed text-fg-2">충돌 안내에 어느 기기가 저장했는지 보여 주는 이름입니다. 영문·숫자·기호 40자까지, 비우면 기본 이름({snap.effectiveLabel})을 씁니다.</p>
-      </div>
-    </section>
+    <LifeHubPanel
+      view={view}
+      snap={snap}
+      session={session}
+      loggedIn={loggedIn}
+      connectAvailable={hub.connectAvailable}
+      replaced={replaced}
+      busy={busy}
+      onConnect={() => void hub.connect()}
+      onDisconnect={() => void disconnect()}
+      onSync={() => void sync()}
+      onLoadCloud={() => void loadCloud()}
+      onOverwrite={() => void overwrite()}
+      onDeviceLabel={label => hub.engine.setDeviceLabel(label)}
+      onDownloadReplaced={() => {
+        const previous = loadReplacedSession();
+        if (previous) exportBackup(previous);
+      }}
+      onClearReplaced={async () => {
+        const ok = await confirm({ title: '남겨 둔 세션을 지울까요?', message: '파일로 내려받지 않았다면 되돌릴 수 없습니다.', confirmLabel: '지우기', tone: 'danger' });
+        if (ok) { clearReplacedSession(); setReplaced(false); }
+      }}
+    />
   );
 }

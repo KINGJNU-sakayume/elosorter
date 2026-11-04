@@ -5,7 +5,8 @@ import { useLoggedIn } from '../../hooks/useAuth';
 import { useAppDispatch, useAppState, useSave } from '../../state/context';
 import AccountCard from './AccountCard';
 import FileBackup from './FileBackup';
-import LifeHubSync from '../../components/LifeHubSync';
+import { LifeHubStatusLine } from '../../components/LifeHubSync';
+import { useLifeHubView } from '../../hooks/useLifeHubView';
 import LoginCard, { HowItWorks, Welcome } from './LoginCard';
 import SessionCard from './SessionCard';
 import SourcePicker from './SourcePicker';
@@ -47,10 +48,11 @@ function OwnerBanner() {
  * 불러오기. 넓은 화면은 한 화면에 맞춘 두 열: 왼쪽 세션·백업, 오른쪽 음악 고르기(목록만 안에서 스크롤).
  * 좁은 화면은 한 열로 쌓고 넘치면 스크롤한다.
  */
-export default function ImportPhase({ onOpenSettings }: { onOpenSettings: () => void }) {
+export default function ImportPhase({ onOpenSettings, onOpenLifeHub }: { onOpenSettings: () => void; onOpenLifeHub: () => void }) {
   const loggedIn = useLoggedIn();
   const { session } = useAppState();
   const save = useSave();
+  const hubView = useLifeHubView();
   const hasSession = session.tracks.length > 0;
 
   if (!loggedIn && !hasSession) {
@@ -75,7 +77,7 @@ export default function ImportPhase({ onOpenSettings }: { onOpenSettings: () => 
             {hasSession ? <SessionCard /> : <HowItWorks />}
             {!loggedIn && <div className="md:hidden"><LoginCard onOpenSettings={onOpenSettings} /></div>}
             <section aria-label="백업" className="@container divide-y divide-line overflow-hidden rounded-2xl bg-section">
-              {loggedIn && <div className="px-4 py-4 sm:px-5"><LifeHubSync /></div>}
+              {loggedIn && <div className="px-4 py-3 sm:px-5"><LifeHubStatusLine view={hubView} onOpenSettings={onOpenLifeHub} /></div>}
               <FileBackup />
             </section>
           </div>

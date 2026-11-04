@@ -10,6 +10,7 @@ import { exportBackup } from '../services/download';
 import type { HubInfo, ShowToast } from './context';
 import type { Action, AppState } from './reducer';
 import { autoSaveDelay } from './savePolicy';
+import { shouldEnableSync } from './saveStatus';
 
 interface Options {
   state: AppState;
@@ -71,7 +72,7 @@ export function useLifeHubSync({ state, dispatch, flushLocal, toast }: Options):
       done => {
         if (!done) return;
         engine.refresh();
-        toast('Life Hub에 연결했습니다. 동기화는 설정에서 켜세요', 'success');
+        toast('Life Hub에 연결했습니다', 'success');
         void engine.notifyConnected();
       },
       (e: unknown) => {
@@ -89,6 +90,12 @@ export function useLifeHubSync({ state, dispatch, flushLocal, toast }: Options):
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [engine]);
+
+  // 연결 + 로그인이면 동기화는 항상 켜짐 (예전 저장값의 "꺼짐"도 켠다)
+  const needsEnable = shouldEnableSync(snapshot, loggedIn);
+  useEffect(() => {
+    if (needsEnable) void engine.setEnabled(true);
+  }, [needsEnable, engine]);
 
   const ready = snapshot.enabled && snapshot.connected && !!userId;
 

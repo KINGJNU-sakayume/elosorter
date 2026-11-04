@@ -19,7 +19,9 @@ export default function App() {
   const toast = useToast();
   const loggedIn = useLoggedIn();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const [settingsFocus, setSettingsFocus] = useState<'lifehub' | null>(null);
+  const openSettings = useCallback(() => { setSettingsFocus(null); setSettingsOpen(true); }, []);
+  const openLifeHub = useCallback(() => { setSettingsFocus('lifehub'); setSettingsOpen(true); }, []);
 
   // OAuth 리다이렉트(?code=…) 처리
   useEffect(() => {
@@ -47,6 +49,7 @@ export default function App() {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === ',') {
         e.preventDefault();
+        setSettingsFocus(null);
         setSettingsOpen(open => !open);
       }
     };
@@ -65,7 +68,7 @@ export default function App() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onOpenSettings={openSettings} />
         <main id="main" className="relative min-h-0 flex-1 overflow-hidden">
-          {phase === 'import' && <ImportPhase onOpenSettings={openSettings} />}
+          {phase === 'import' && <ImportPhase onOpenSettings={openSettings} onOpenLifeHub={openLifeHub} />}
           {phase === 'tier' && <TierPhase />}
           {phase === 'sort' && <SortPhase />}
           {phase === 'rank' && <RankPhase />}
@@ -74,6 +77,7 @@ export default function App() {
       </div>
       <SettingsModal
         open={settingsOpen}
+        focus={settingsFocus}
         onClose={() => setSettingsOpen(false)}
         onSaved={() => {
           setSettingsOpen(false);

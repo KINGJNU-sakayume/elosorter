@@ -13,7 +13,7 @@ export interface SaveView {
   action?: 'save' | 'import';
 }
 
-const LOCAL_ONLY = '이 브라우저(localStorage)에 자동 저장됩니다. 다른 기기로 옮기려면 백업 파일을 내려받거나, 설정에서 Life Hub 동기화를 켜세요.';
+const LOCAL_ONLY = '이 브라우저(localStorage)에 자동 저장됩니다. 다른 기기로 옮기려면 백업 파일을 내려받거나, 설정에서 Life Hub에 연결하세요.';
 
 export function saveView({ cloud, unsaved, lastSaveAt, localError }: {
   cloud: CloudStatus;
@@ -28,13 +28,13 @@ export function saveView({ cloud, unsaved, lastSaveAt, localError }: {
     case 'signed_out':
       return { icon: HardDrive, label: '이 기기에 저장됨', title: '로그아웃 상태라 Life Hub 동기화를 멈췄습니다. 이 기기에는 계속 저장되고, Spotify에 로그인하면 이어서 동기화합니다.', tone: 'text-fg-2' };
     case 'disconnected':
-      return { icon: CloudOff, label: 'Life Hub 연결 필요', title: 'Life Hub 동기화가 켜져 있지만 연결이 끊겼습니다. 이 기기에는 계속 저장됩니다. 설정에서 다시 연결하거나 동기화를 끄세요.', tone: 'text-warn' };
+      return { icon: CloudOff, label: 'Life Hub 연결 필요', title: 'Life Hub 연결이 끊겼습니다. 이 기기에는 계속 저장됩니다. 설정에서 다시 연결하세요.', tone: 'text-warn' };
     case 'blocked':
       return { icon: CloudOff, label: '다른 계정 세션', title: '다른 Spotify 계정으로 만든 세션이라 Life Hub 저장을 멈췄습니다.', tone: 'text-warn', action: 'import' };
     case 'conflict':
       return { icon: TriangleAlert, label: 'Life Hub 충돌', title: 'Life Hub에 이 세션과 다른 버전이 있어 자동 저장을 멈췄습니다. 불러오기 화면에서 어느 쪽을 쓸지 고르세요.', tone: 'text-warn', action: 'import' };
     case 'forbidden':
-      return { icon: CloudOff, label: '동기화 권한 없음', title: 'Life Hub 연결에 동기화 권한이 없습니다. 설정에서 다시 연결하면서 동기화를 허용하세요.', tone: 'text-warn' };
+      return { icon: CloudOff, label: '동기화 권한 없음', title: 'Life Hub 연결에 동기화 권한이 없습니다. 설정에서 다시 연결하세요.', tone: 'text-warn' };
     case 'too_large':
       return { icon: TriangleAlert, label: '동기화 문서 너무 큼', title: '동기화 문서가 한도를 넘어 자동 동기화를 멈췄습니다. 설정에서 크기를 확인하세요. 로컬 저장과 백업 파일은 그대로 됩니다.', tone: 'text-warn' };
     case 'saving':
