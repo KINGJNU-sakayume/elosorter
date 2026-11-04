@@ -15,3 +15,11 @@ export function primaryStatus(snap: Pick<HubSnapshot, 'enabled' | 'connected' | 
   if (!loggedIn) return 'signed_out';
   return snap.status;
 }
+
+/**
+ * 동기화 켜기/끄기 스위치는 없다: Life Hub에 연결되어 있고 Spotify에 로그인되어 있으면 동기화는 켜진 것이다.
+ * 예전 저장값에 "꺼짐"이 남아 있으면 켜야 한다 (토큰에 동기화 권한이 없으면 엔진이 '권한 없음'으로 보여 준다).
+ */
+export function shouldEnableSync(snap: Pick<HubSnapshot, 'enabled' | 'connected'>, loggedIn: boolean): boolean {
+  return snap.connected && loggedIn && !snap.enabled;
+}

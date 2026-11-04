@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { primaryStatus } from './saveStatus';
+import { primaryStatus, shouldEnableSync } from './saveStatus';
 
 describe('primaryStatus (what the sidebar shows)', () => {
   it('sync off → this device (and the JSON backup file) only, whatever else is true', () => {
@@ -20,5 +20,16 @@ describe('primaryStatus (what the sidebar shows)', () => {
   it('sync on but the connection is gone → disconnected', () => {
     expect(primaryStatus({ enabled: true, connected: false, status: 'idle' }, true)).toBe('disconnected');
     expect(primaryStatus({ enabled: true, connected: false, status: 'idle' }, false)).toBe('disconnected');
+  });
+});
+
+describe('shouldEnableSync (no on/off switch)', () => {
+  it('connected + logged in → sync turns on even if the stored value says off', () => {
+    expect(shouldEnableSync({ connected: true, enabled: false }, true)).toBe(true);
+  });
+  it('already on, not connected, or logged out → nothing to do', () => {
+    expect(shouldEnableSync({ connected: true, enabled: true }, true)).toBe(false);
+    expect(shouldEnableSync({ connected: false, enabled: false }, true)).toBe(false);
+    expect(shouldEnableSync({ connected: true, enabled: false }, false)).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { LogOut, Moon, Settings, Sun, User } from 'lucide-react';
+import { LogOut, Moon, Sun, User } from 'lucide-react';
 import { useLoggedIn, useLogout } from '../../hooks/useAuth';
+import { useLifeHubView } from '../../hooks/useLifeHubView';
 import { coverImages } from '../../lib/covers';
 import { fmtCount } from '../../lib/format';
 import { sourceLabel } from '../../phases/import/sourceLabel';
@@ -10,6 +11,7 @@ import { useTheme } from '../../theme/context';
 import AppMark from '../AppMark';
 import SaveIndicator from '../SaveIndicator';
 import { Mosaic } from '../ui/Cover';
+import SettingsButton from './SettingsButton';
 import { STEPS, stepMeta } from './steps';
 
 const iconBtn = 'flex size-8 shrink-0 items-center justify-center rounded-lg text-fg-2 hover:bg-sub hover:text-fg';
@@ -21,6 +23,7 @@ export default function Sidebar({ onOpenSettings }: { onOpenSettings: () => void
   const loggedIn = useLoggedIn();
   const logout = useLogout();
   const { theme, toggle } = useTheme();
+  const hubAttention = useLifeHubView().kind === 'C';
   const covers = useMemo(() => coverImages(session.tracks), [session.tracks]);
   const hasSession = session.tracks.length > 0;
 
@@ -101,9 +104,7 @@ export default function Sidebar({ onOpenSettings }: { onOpenSettings: () => void
               <LogOut size={16} aria-hidden />
             </button>
           )}
-          <button type="button" onClick={onOpenSettings} aria-label="설정 (Ctrl+,)" title="설정 (Ctrl+,)" className={iconBtn}>
-            <Settings size={16} aria-hidden />
-          </button>
+          <SettingsButton onClick={onOpenSettings} label="설정 (Ctrl+,)" attention={hubAttention} iconSize={16} className={iconBtn} />
           <button
             type="button"
             onClick={toggle}

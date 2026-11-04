@@ -130,38 +130,39 @@ try {
     await context.close();
   }
 
-  // ── 2. 로그인 + Life Hub 연결: 동기화 켜기 → 끄기 → 다시 켜기 ───────────────
-  console.log('2. 로그인 + Life Hub 연결, 동기화 켜기·끄기');
+  // ── 2. 로그인 + Life Hub 연결: 저장값이 "꺼짐"이어도 동기화는 켜진다 → 지금 동기화 → 연결 해제 ──
+  console.log('2. 로그인 + Life Hub 연결, 켜기/끄기 없이 자동으로 켜짐 · 연결 해제');
   {
     const hub = mockHub();
     const { context, page, supabaseRequests, consoleErrors } = await newPage(browser, {
       eloConfig: LEGACY_CONFIG, eloState: JSON.stringify(session(USER)), ...spotifyTokens, ...hubTokens,
+      'elo:lifehub.sync.v1': JSON.stringify({ enabled: false, everSucceeded: false, lastSyncAt: null, syncedKey: null, deviceLabel: null, pending: null }),
     }, { hub });
-    await sidebarStatus(page).waitFor();
-    assert(await sidebarStatus(page).textContent() === '이 기기에 저장됨', '처음(동기화 꺼짐): "이 기기에 저장됨"');
-    await page.keyboard.press('Control+,');
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('elo:lifehub.sync.v1') ?? '{}').enabled === true);
+    assert(true, '연결 + 로그인 → 저장값 "꺼짐"이 켜짐으로 바뀜');
+    // 불러오기 화면에는 상태 한 줄과 「설정」만 있다
+    const backup = page.getByRole('region', { name: '백업' });
+    assert(await backup.getByRole('button', { name: /동기화|Life Hub 연결|연결 해제/ }).count() === 0, '불러오기 화면에 Life Hub 조작 버튼 없음');
+    await backup.getByRole('button', { name: '설정', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '설정' });
-    await dialog.getByRole('button', { name: '동기화 켜기' }).click();
-    await dialog.getByRole('button', { name: '동기화 끄기' }).waitFor();
+    await dialog.getByRole('heading', { name: 'Life Hub', exact: true }).waitFor();
+    assert(await dialog.getByRole('button', { name: /동기화 (켜기|끄기)/ }).count() === 0, '동기화 켜기/끄기 버튼 없음');
     await dialog.getByRole('button', { name: '지금 동기화' }).click();
     await page.waitForFunction(() => document.querySelector('aside')?.innerText.includes('Life Hub에 저장됨'));
-    assert(hub.puts === 1, '동기화 켜기 → Life Hub에 1번 저장');
+    assert(hub.puts === 1, '지금 동기화 → Life Hub에 1번 저장');
     assert(JSON.parse(hub.doc.body).tracks.length === 12 && !('syncedAt' in JSON.parse(hub.doc.body)), '올라간 문서: 12곡, syncedAt 없음');
+    await dialog.getByText(/^연결됨 · 오늘 \d\d:\d\d 동기화$/).waitFor();
+    assert(true, '상태 줄: "연결됨 · 오늘 HH:MM 동기화"');
 
-    await dialog.getByRole('button', { name: '동기화 끄기' }).click();
-    await page.getByText('이제 이 기기와 백업 파일에만 저장됩니다').waitFor();
-    assert(await sidebarStatus(page).textContent() === '이 기기에 저장됨', '동기화 끄기 → "이 기기에 저장됨"');
+    await dialog.getByRole('button', { name: '연결 해제' }).click();
+    await page.getByRole('button', { name: '연결 끊기' }).click();
+    await dialog.getByRole('button', { name: 'Life Hub 연결' }).waitFor();
+    assert(await sidebarStatus(page).textContent() === '이 기기에 저장됨', '연결 해제 → "이 기기에 저장됨"');
     await page.keyboard.press('Control+,');
     await page.getByRole('button', { name: /티어/ }).first().click();
     await page.keyboard.press('2');
     await page.waitForTimeout(17_000); // 자동 업로드 시점(15초)을 넘겨도
-    assert(hub.puts === 1, '꺼진 동안의 변경은 Life Hub로 보내지 않음');
-
-    await page.keyboard.press('Control+,');
-    await dialog.getByRole('button', { name: '동기화 켜기' }).click();
-    await dialog.getByRole('button', { name: '지금 동기화' }).click();
-    await page.waitForFunction(() => document.querySelector('aside')?.innerText.includes('Life Hub에 저장됨'));
-    assert(hub.puts === 2, '다시 켜기 → 꺼진 동안의 변경을 올림');
+    assert(hub.puts === 1, '연결 해제 뒤의 변경은 Life Hub로 보내지 않음');
     assert(supabaseRequests.length === 0, 'Supabase 요청 0건');
     if (consoleErrors.length) problems.push(`2: ${consoleErrors.join(' | ')}`);
     await context.close();

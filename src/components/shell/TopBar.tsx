@@ -1,8 +1,9 @@
-import { Settings } from 'lucide-react';
 import { fmtCount } from '../../lib/format';
+import { useLifeHubView } from '../../hooks/useLifeHubView';
 import { useAppState } from '../../state/context';
 import AppMark from '../AppMark';
 import SaveIndicator from '../SaveIndicator';
+import SettingsButton from './SettingsButton';
 import { stepLabel } from './steps';
 
 /**
@@ -11,6 +12,7 @@ import { stepLabel } from './steps';
  */
 export default function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
   const { phase, session } = useAppState();
+  const attention = useLifeHubView().kind === 'C';
   return (
     <header className="z-30 shrink-0 border-b border-line bg-bar pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150 lg:hidden">
       <div className="flex h-12 items-center gap-1 pr-0.5 pl-3 sm:pr-2 sm:pl-4">
@@ -25,15 +27,13 @@ export default function TopBar({ onOpenSettings }: { onOpenSettings: () => void 
           </span>
         </div>
         <SaveIndicator variant="icon" />
-        <button
-          type="button"
+        <SettingsButton
           onClick={onOpenSettings}
-          aria-label="설정"
-          title="설정"
+          label="설정"
+          attention={attention}
+          iconSize={20}
           className="flex size-11 items-center justify-center rounded-full text-fg-2 hover:bg-sub hover:text-fg"
-        >
-          <Settings size={20} aria-hidden />
-        </button>
+        />
       </div>
     </header>
   );
