@@ -22,8 +22,8 @@ export default function CloudBackup({ onOpenSettings }: { onOpenSettings: () => 
     return (
       <div className="flex flex-col gap-3 px-4 py-4 @sm:flex-row @sm:items-center sm:px-5">
         <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] font-semibold">클라우드 백업</h3>
-          <p className="mt-0.5 text-[13px] text-fg-2">꺼져 있습니다. Supabase를 설정하면 여러 기기에서 이어서 할 수 있습니다.</p>
+          <h3 className="text-[15px] font-semibold">클라우드 백업 (Supabase) <span className="text-xs font-normal text-fg-2">5단계에서 정리 예정</span></h3>
+          <p className="mt-0.5 text-[13px] text-fg-2">꺼져 있습니다. 여러 기기에서 이어서 하려면 위의 Life Hub 동기화를 쓰세요.</p>
         </div>
         <Button size="sm" icon={Settings} className="self-start @sm:self-auto" onClick={onOpenSettings}>설정</Button>
       </div>
@@ -83,14 +83,17 @@ export default function CloudBackup({ onOpenSettings }: { onOpenSettings: () => 
 
   return (
     <div className={`px-4 py-4 sm:px-5 ${save.cloud === 'conflict' ? 'bg-warn-soft' : ''}`}>
-      <h3 className="text-[15px] font-semibold">클라우드 백업</h3>
+      <h3 className="text-[15px] font-semibold">클라우드 백업 (Supabase) <span className="text-xs font-normal text-fg-2">5단계에서 정리 예정</span></h3>
+      {save.writesStopped && (
+        <p className="mt-0.5 text-xs text-fg-2">Life Hub 동기화가 켜져 있어 여기에는 더 이상 쓰지 않습니다. 읽기(불러오기)만 됩니다. 동기화를 끄면 이 백업으로 돌아갑니다.</p>
+      )}
       {summary === undefined ? (
         <p className="mt-0.5 text-[13px] text-fg-2">클라우드 상태를 확인하는 중…</p>
       ) : summary === null ? (
         <div className="mt-0.5 flex flex-col items-start gap-3 @sm:flex-row @sm:items-center @sm:justify-between">
           <p className="text-[13px] text-fg-2">클라우드에 저장된 세션이 없습니다.{hasLocal && ' 변경 사항은 자동으로 백업됩니다.'}</p>
           {hasLocal && (
-            <Button size="sm" icon={CloudUpload} loading={save.cloud === 'saving'} onClick={() => void save.saveNow()}>
+            <Button size="sm" icon={CloudUpload} loading={save.cloud === 'saving'} disabled={save.writesStopped} onClick={() => void save.saveNow()}>
               지금 백업
             </Button>
           )}
@@ -126,7 +129,7 @@ export default function CloudBackup({ onOpenSettings }: { onOpenSettings: () => 
                 size="sm"
                 icon={CloudUpload}
                 loading={save.cloud === 'saving'}
-                disabled={save.cloud === 'blocked' || inSync}
+                disabled={save.cloud === 'blocked' || inSync || save.writesStopped}
                 onClick={async () => {
                   if (save.cloud === 'conflict') {
                     const ok = await confirm({

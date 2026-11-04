@@ -4,6 +4,7 @@ import { loadConfig, saveConfig } from '../services/config';
 import { useTheme } from '../theme/context';
 import type { Theme } from '../theme/context';
 import Button from './ui/Button';
+import LifeHubSync from './LifeHubSync';
 import Modal from './ui/Modal';
 import Segmented from './ui/Segmented';
 
@@ -81,6 +82,10 @@ function SettingsForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: ()
           <Segmented label="화면 테마" options={THEMES} value={theme} onChange={setTheme} />
         </div>
 
+        <LifeHubSync />
+
+        <hr className="border-line" />
+
         <div>
           <label htmlFor="cfg-client" className={labelCls}>Spotify Client ID</label>
           <input id="cfg-client" className={inputCls} value={clientId} onChange={e => setClientId(e.target.value)}
@@ -94,13 +99,13 @@ function SettingsForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: ()
         </div>
 
         <div>
-          <label htmlFor="cfg-url" className={labelCls}>Supabase URL <span className="font-normal text-fg-2">(선택)</span></label>
+          <label htmlFor="cfg-url" className={labelCls}>Supabase URL <span className="font-normal text-fg-2">(선택 · 5단계에서 정리 예정)</span></label>
           <input id="cfg-url" className={inputCls} value={supabaseUrl} onChange={e => setSupabaseUrl(e.target.value)}
             placeholder="https://xxxx.supabase.co" autoComplete="off" spellCheck={false} inputMode="url" />
         </div>
 
         <div>
-          <label htmlFor="cfg-key" className={labelCls}>Supabase anon key <span className="font-normal text-fg-2">(선택)</span></label>
+          <label htmlFor="cfg-key" className={labelCls}>Supabase anon key <span className="font-normal text-fg-2">(선택 · 5단계에서 정리 예정)</span></label>
           <div className="relative">
             <input id="cfg-key" type={showKey ? 'text' : 'password'} className={`${inputCls} pr-11`} value={anonKey}
               onChange={e => setAnonKey(e.target.value)} placeholder="eyJhbGciOi…" autoComplete="off" spellCheck={false} />

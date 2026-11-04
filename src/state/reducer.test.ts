@@ -220,3 +220,38 @@ describe('enrichDurations', () => {
     expect(next.revision).toBe(s.revision);
   });
 });
+
+describe('Life Hub bookkeeping', () => {
+  it('counts Life Hub saves apart from Supabase and never creates a change by itself', () => {
+    const s = sortedSession();
+    const saved = reducer(s, { type: 'hubSaved', revision: s.revision, version: 3 });
+    expect(saved.revision).toBe(s.revision);
+    expect(saved.hubRevision).toBe(s.revision);
+    expect(saved.cloudRevision).toBe(s.cloudRevision); // Supabase 쪽 저장 상태를 가리지 않는다
+    expect(saved.session.syncVersion).toBe(3);
+    // 이미 같은 version이면 세션 객체를 바꾸지 않는다 (불필요한 로컬 저장을 막는다)
+    const again = reducer(saved, { type: 'hubSaved', revision: s.revision, version: 3 });
+    expect(again.session).toBe(saved.session);
+    expect(reducer(saved, { type: 'hubBase', version: 3 })).toBe(saved);
+    expect(reducer(saved, { type: 'hubBase', version: 4 }).session.syncVersion).toBe(4);
+    expect(reducer(saved, { type: 'hubBase', version: 4 }).hubRevision).toBe(saved.hubRevision);
+  });
+
+  it('keeps the server version only for a copy that came from Life Hub', () => {
+    const s = sortedSession();
+    const copy = { ...s.session, syncVersion: 7 };
+    const fromHub = reducer(s, { type: 'hydrate', session: copy, origin: 'hub' });
+    expect(fromHub.session.syncVersion).toBe(7);
+    expect(fromHub.hubRevision).toBe(fromHub.revision);
+    expect(fromHub.session.syncedAt).toBeNull();
+    // 파일·Supabase 사본에 들어 있는 다른 기기의 version은 이 기기의 기준이 아니다
+    expect(reducer(s, { type: 'hydrate', session: copy, origin: 'file' }).session.syncVersion).toBeNull();
+    expect(reducer(s, { type: 'hydrate', session: copy, origin: 'cloud' }).session.syncVersion).toBeNull();
+    expect(reducer(s, { type: 'hydrate', session: copy, origin: 'file' }).hubRevision).toBeLessThan(fromHub.hubRevision);
+  });
+
+  it('a new session or a reset starts without a Life Hub base', () => {
+    const s = reducer(sortedSession(), { type: 'hubSaved', revision: 0, version: 5 });
+    expect(reducer(s, { type: 'reset' }).session.syncVersion).toBeNull();
+  });
+});

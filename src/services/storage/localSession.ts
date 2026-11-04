@@ -5,6 +5,8 @@ const SESSION_KEY = 'eloState';
 // v1 원본은 처음 옮길 때 한 번만 따로 보관 (자동으로 읽지는 않음)
 const V1_BACKUP_KEY = 'eloState.v1-backup';
 const UI_KEY = 'eloUi';
+// Life Hub의 세션으로 바꾸기 직전의 이 기기 세션 (한 칸). 수동 백업 파일로 내려받을 수 있게 남긴다
+const REPLACED_KEY = 'elo:replaced-session.v1';
 
 export function loadLocalSession(): SessionData | null {
   try {
@@ -49,4 +51,33 @@ export function loadUiPrefs(): Record<string, unknown> {
 
 export function saveUiPrefs(prefs: Record<string, unknown>): void {
   try { localStorage.setItem(UI_KEY, JSON.stringify(prefs)); } catch { /* 무시 */ }
+}
+
+// ── 바꾸기 전 세션 보관 ──────────────────────────────────────────────────
+
+/** 저장하지 못하면(용량 초과 등) false — 호출한 쪽이 파일로 내려받게 한다 */
+export function stashReplacedSession(session: SessionData): boolean {
+  try {
+    localStorage.setItem(REPLACED_KEY, JSON.stringify({ ...serializeSession(session), replacedAt: new Date().toISOString() }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function loadReplacedSession(): SessionData | null {
+  try {
+    const raw = localStorage.getItem(REPLACED_KEY);
+    return raw ? parseSession(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+export const hasReplacedSession = (): boolean => {
+  try { return localStorage.getItem(REPLACED_KEY) !== null; } catch { return false; }
+};
+
+export function clearReplacedSession(): void {
+  try { localStorage.removeItem(REPLACED_KEY); } catch { /* 무시 */ }
 }

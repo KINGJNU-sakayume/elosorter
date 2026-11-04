@@ -6,6 +6,7 @@ import { useAppDispatch, useAppState, useSave } from '../../state/context';
 import AccountCard from './AccountCard';
 import CloudBackup from './CloudBackup';
 import FileBackup from './FileBackup';
+import LifeHubSync from '../../components/LifeHubSync';
 import LoginCard, { HowItWorks, Welcome } from './LoginCard';
 import SessionCard from './SessionCard';
 import SourcePicker from './SourcePicker';
@@ -19,7 +20,7 @@ function OwnerBanner() {
     <div role="alert" className="flex flex-col gap-3 rounded-2xl bg-warn-soft p-4 text-sm sm:flex-row sm:items-center">
       <TriangleAlert className="hidden shrink-0 text-warn sm:block" aria-hidden />
       <p className="flex-1">
-        이 브라우저의 세션은 <strong>다른 Spotify 계정</strong>으로 만든 것입니다. 섞이지 않도록 클라우드 백업을 멈췄습니다.
+        이 브라우저의 세션은 <strong>다른 Spotify 계정</strong>으로 만든 것입니다. 섞이지 않도록 클라우드 저장을 멈췄습니다.
       </p>
       <div className="flex gap-2">
         <Button size="sm" onClick={() => dispatch({ type: 'claimSession' })}>내 세션으로 쓰기</Button>
@@ -70,11 +71,12 @@ export default function ImportPhase({ onOpenSettings }: { onOpenSettings: () => 
         <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[minmax(19rem,5fr)_7fr] md:gap-5 lg:grid-cols-[minmax(22rem,5fr)_7fr] lg:gap-8">
           <div className="flex min-h-0 flex-col gap-4 md:overflow-y-auto">
             {loggedIn && <AccountCard className="lg:hidden" />}
-            {save.cloud === 'blocked' && <OwnerBanner />}
+            {save.primary.cloud === 'blocked' && <OwnerBanner />}
             {hasSession && <SyncBanners />}
             {hasSession ? <SessionCard /> : <HowItWorks />}
             {!loggedIn && <div className="md:hidden"><LoginCard onOpenSettings={onOpenSettings} /></div>}
             <section aria-label="백업" className="@container divide-y divide-line overflow-hidden rounded-2xl bg-section">
+              {loggedIn && <div className="px-4 py-4 sm:px-5"><LifeHubSync /></div>}
               {loggedIn && <CloudBackup onOpenSettings={onOpenSettings} />}
               <FileBackup />
             </section>
