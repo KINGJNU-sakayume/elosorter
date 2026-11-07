@@ -6,14 +6,14 @@ import { SESSION_VERSION, type SessionData } from '../../core/session/schema';
 import {
   BOARD_STATE_KEY, boardGateOpen, createBoardUploader, DAILY_MS, MIN_INTERVAL_MS, readBoardState, type BoardUploaderOptions,
 } from './boardUpload';
-import { BOARD_SCOPE, LIFEHUB_ORIGIN, SYNC_SCOPE, type Deps } from './remote';
+import { BOARD_SCOPE, CONNECTED_AT_KEY, LIFEHUB_ORIGIN, SYNC_SCOPE, type Deps } from './remote';
 import { memoryStorage } from './testing';
 
 const TOKENS_KEY = 'elo:lifehub.tokens.v1';
 const BOARD_URL = `${LIFEHUB_ORIGIN}/elosorter/v1/board`;
 
 interface Call { url: string; method: string; headers: Record<string, string>; body: string }
-type Reply = { status: number; body?: unknown; headers?: Record<string, string> } | 'network';
+type Reply = { status: number; body?: unknown; headers?: Record<string, string>; wait?: Promise<void> } | 'network';
 
 function setup({ replies = [] as Reply[], scope = `${SYNC_SCOPE} ${BOARD_SCOPE}`, session = sampleSession(), ready = true } = {}) {
   const storage = memoryStorage();
@@ -35,6 +35,7 @@ function setup({ replies = [] as Reply[], scope = `${SYNC_SCOPE} ${BOARD_SCOPE}`
     calls.push({ url, method: init.method ?? 'GET', headers: Object.fromEntries(new Headers(init.headers).entries()), body: String(init.body ?? '') });
     const r = queue.shift() ?? { status: 200, body: { ok: true } };
     if (r === 'network') throw new TypeError('network down');
+    if (r.wait) await r.wait;
     return new Response(JSON.stringify(r.body ?? {}), { status: r.status, headers: r.headers });
   }) as typeof globalThis.fetch;
 
@@ -187,6 +188,38 @@ describe('board upload', () => {
     const h = setup({ scope: SYNC_SCOPE, replies: [{ status: 403, body: { error: 'insufficient_scope' } }] });
     expect(await h.uploader.start()).toBe('no_scope');
     expect(h.tokens()).not.toBeNull();
+  });
+
+  it('reconnecting releases the halt even when the token response carries no scope', async () => {
+    const h = setup({ scope: SYNC_SCOPE, replies: [insufficient] });
+    h.storage.setItem(CONNECTED_AT_KEY, String(h.clock.t - DAILY_MS)); // 예전 연결
+    expect(await h.uploader.start()).toBe('no_scope');
+    // scope 필드 없는 새 토큰으로 다시 연결
+    await h.advance(60_000);
+    h.storage.setItem(TOKENS_KEY, JSON.stringify({ access_token: 'at-new', refresh_token: 'rt-new', access_expires_at: h.clock.t + 3_600_000 }));
+    expect(h.uploader.needsReconnect()).toBe(true); // 아직 다시 연결을 마치지 않음
+    h.storage.setItem(CONNECTED_AT_KEY, String(h.clock.t));
+    expect(h.uploader.needsReconnect()).toBe(false);
+    await h.advance(MIN_INTERVAL_MS);
+    expect(await h.uploader.start()).toBe('sent');
+    expect(readBoardState(h.storage)).toMatchObject({ halt: null, haltedAt: null });
+  });
+
+  it('a change that arrives while a request is in flight is sent when the 10 minutes are up', async () => {
+    let release!: () => void;
+    const wait = new Promise<void>(r => { release = r; });
+    const h = setup({ replies: [{ status: 200, wait }] });
+    const first = h.uploader.start();
+    await new Promise(r => setTimeout(r, 0));
+    h.state.session = withComparison(h.state.session);
+    expect(await h.uploader.notifyChange()).toBe('skipped'); // 보내는 중
+    release();
+    expect(await first).toBe('sent');
+    expect(readBoardState(h.storage).pending).toBe(true);
+    expect(h.timers).toHaveLength(1);
+    await h.advance(MIN_INTERVAL_MS);
+    expect(h.calls).toHaveLength(2);
+    expect(JSON.parse(h.calls[1].body).tiles[0].data.foot).toContain('비교 215회');
   });
 
   it('any other 403 follows the existing rule: the token is dropped', async () => {

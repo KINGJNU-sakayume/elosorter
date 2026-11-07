@@ -25,6 +25,8 @@ const API = RESOURCE + '/v1';
 export const CALLBACK_KEY = 'elo:lifehub.callback.v1';
 const TOKENS_KEY = 'elo:lifehub.tokens.v1';
 const PENDING_AUTH_KEY = 'elo:lifehub.pending-auth.v1';
+/** 마지막으로 연결(인증 코드 교환)을 마친 시각(ms). 비밀이 아니다. 보드 업로드의 권한 부족 멈춤을 다시 연결 뒤 푸는 데 쓴다 */
+export const CONNECTED_AT_KEY = 'elo:lifehub.connected-at.v1';
 const AUTH_MAX_AGE_MS = 10 * 60 * 1000;
 const SYNC_TIMEOUT_MS = 30_000;
 
@@ -101,6 +103,12 @@ export function grantedScopes(deps: Pick<Deps, 'storage'>): string[] | null {
 /** 토큰이 동기화 scope가 없다고 알려진 경우에만 false. 모르면 시도하고 403이 알려 준다 */
 export const mayHaveSyncScope = (deps: Pick<Deps, 'storage'>): boolean => grantedScopes(deps)?.includes(SYNC_SCOPE) ?? true;
 
+/** 마지막으로 연결을 마친 시각. 모르면 null */
+export function connectedAt(deps: Pick<Deps, 'storage'>): number | null {
+  const n = Number(deps.storage.getItem(CONNECTED_AT_KEY));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 /** 토큰이 보드 scope를 가진다고 알려진 경우에만 true (다시 연결한 뒤 멈춤을 풀 때 쓴다) */
 export const knownBoardScope = (deps: Pick<Deps, 'storage'>): boolean => grantedScopes(deps)?.includes(BOARD_SCOPE) ?? false;
 
@@ -170,6 +178,7 @@ export async function completeStoredCallback(deps: Deps): Promise<boolean> {
   const code = q.get('code');
   if (!code) throw new LifeHubError('state', '인증 코드가 없어요.');
   await tokenRequest(deps, { grant_type: 'authorization_code', code, redirect_uri: CALLBACK_URL, code_verifier: pending.verifier, resource: RESOURCE });
+  try { deps.storage.setItem(CONNECTED_AT_KEY, String(deps.now())); } catch { /* 없어도 scope로 판단한다 */ }
   return true;
 }
 

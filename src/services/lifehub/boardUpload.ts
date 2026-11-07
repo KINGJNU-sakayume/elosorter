@@ -12,7 +12,7 @@
 import type { SessionData } from '../../core/session/schema';
 import { buildBoardTiles, hasAnyRecord, type BoardManifest } from '../../core/board/tiles';
 import type { HubSnapshot } from './engine';
-import { boardRequest, isConnected, knownBoardScope, LifeHubError, type Deps } from './remote';
+import { boardRequest, connectedAt, isConnected, knownBoardScope, LifeHubError, type Deps } from './remote';
 
 export const BOARD_STATE_KEY = 'elo:lifehub.board.v1';
 export const MIN_INTERVAL_MS = 10 * 60 * 1000;
@@ -30,11 +30,13 @@ export interface BoardState {
   pending: boolean;
   /** insufficient_scope: 다시 연결할 때까지 멈춘다(토큰은 그대로) */
   halt: 'no_scope' | null;
+  /** 멈춘 시각. 그 뒤에 다시 연결했으면(connectedAt) 멈춤을 푼다 */
+  haltedAt: number | null;
   /** 400/413으로 거절된 본문의 sha. 같은 내용으로 다시 보내지 않는다 */
   rejectedSha: string | null;
 }
 
-const EMPTY: BoardState = { sha: null, lastOkAt: null, lastSentAt: null, lastGeneratedAt: null, pending: false, halt: null, rejectedSha: null };
+const EMPTY: BoardState = { sha: null, lastOkAt: null, lastSentAt: null, lastGeneratedAt: null, pending: false, halt: null, haltedAt: null, rejectedSha: null };
 
 export function readBoardState(storage: Pick<Storage, 'getItem'>): BoardState {
   try {
@@ -46,7 +48,7 @@ export function readBoardState(storage: Pick<Storage, 'getItem'>): BoardState {
     const ms = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null);
     return {
       sha: str(o.sha), lastOkAt: ms(o.lastOkAt), lastSentAt: ms(o.lastSentAt), lastGeneratedAt: str(o.lastGeneratedAt),
-      pending: o.pending === true, halt: o.halt === 'no_scope' ? 'no_scope' : null, rejectedSha: str(o.rejectedSha),
+      pending: o.pending === true, halt: o.halt === 'no_scope' ? 'no_scope' : null, haltedAt: ms(o.haltedAt), rejectedSha: str(o.rejectedSha),
     };
   } catch {
     return { ...EMPTY };
@@ -101,9 +103,19 @@ export function createBoardUploader(options: BoardUploaderOptions) {
     return () => clearTimeout(id);
   });
   let running = false;
+  /** 보내는 중에 들어온 시도: 끝난 뒤 10분이 차는 때 한 번 더 */
+  let rerun = false;
   let cancelTimer: (() => void) | null = null;
 
   const read = () => readBoardState(deps.storage);
+  /**
+   * 권한 부족 멈춤이 풀렸는가: 새 토큰이 board scope를 가졌다고 알려졌거나, 멈춘 뒤에 다시 연결했다
+   * (토큰 응답에 scope가 없어도 다시 연결하면 한 번은 시도한다. 여전히 권한이 없으면 다시 멈춘다).
+   */
+  const unhalted = (s: BoardState) => {
+    const at = connectedAt(deps);
+    return knownBoardScope(deps) || (at !== null && (s.haltedAt === null || at > s.haltedAt));
+  };
   const write = (patch: Partial<BoardState>) => {
     try {
       deps.storage.setItem(BOARD_STATE_KEY, JSON.stringify({ ...read(), ...patch }));
@@ -125,14 +137,17 @@ export function createBoardUploader(options: BoardUploaderOptions) {
    * 던지지 않는다(앱의 다른 기능을 막지 않는다).
    */
   async function attempt(daily = false): Promise<AttemptResult> {
-    if (running) return 'skipped';
+    if (running) {
+      rerun = true;
+      return 'skipped';
+    }
     running = true;
     try {
       if (!isConnected(deps)) return 'skipped';
       let state = read();
       // 다시 연결해서 새 토큰이 board 권한을 가지면 멈춤을 푼다
-      if (state.halt === 'no_scope' && knownBoardScope(deps)) {
-        write({ halt: null });
+      if (state.halt === 'no_scope' && unhalted(state)) {
+        write({ halt: null, haltedAt: null });
         state = read();
       }
       if (state.halt) return 'no_scope';
@@ -172,7 +187,7 @@ export function createBoardUploader(options: BoardUploaderOptions) {
         response = await boardRequest(deps, body);
       } catch (e) {
         if (e instanceof LifeHubError && e.kind === 'no_board_scope') {
-          write({ halt: 'no_scope', pending: true });
+          write({ halt: 'no_scope', haltedAt: deps.now(), pending: true });
           return 'no_scope';
         }
         if (e instanceof LifeHubError && e.kind === 'not_connected') {
@@ -201,6 +216,14 @@ export function createBoardUploader(options: BoardUploaderOptions) {
       return 'retry';
     } finally {
       running = false;
+      if (rerun) {
+        rerun = false;
+        // 이미 예약이 있으면 그것을 쓴다. 없으면 10분 창이 끝나는 때 (창 밖이면 곧바로)
+        if (!cancelTimer) {
+          const { lastSentAt } = read();
+          arm(lastSentAt === null ? 0 : lastSentAt + MIN_INTERVAL_MS - deps.now());
+        }
+      }
     }
   }
 
@@ -216,7 +239,10 @@ export function createBoardUploader(options: BoardUploaderOptions) {
     start(): Promise<AttemptResult> {
       return attempt(true);
     },
-    needsReconnect: (): boolean => read().halt === 'no_scope' && !knownBoardScope(deps),
+    needsReconnect: (): boolean => {
+      const s = read();
+      return s.halt === 'no_scope' && !unhalted(s);
+    },
     dispose(): void {
       cancelTimer?.();
       cancelTimer = null;

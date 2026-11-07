@@ -3,7 +3,7 @@ import callbackHtml from '../../../public/lifehub/index.html?raw';
 import clientJson from '../../../public/lifehub-client.json?raw';
 import viteConfig from '../../../vite.config.ts?raw';
 import {
-  APP_URL, beginConnect, CALLBACK_KEY, CALLBACK_URL, CLIENT_ID, completeStoredCallback, connectAvailable, disconnect,
+  APP_URL, beginConnect, CALLBACK_KEY, CALLBACK_URL, CLIENT_ID, completeStoredCallback, connectAvailable, connectedAt, disconnect,
   grantedScopes, isConnected, LIFEHUB_ORIGIN, LifeHubError, mayHaveSyncScope, RESOURCE, SYNC_SCOPE, syncRequest,
 } from './remote';
 import { connected, FakeHub, makeDeps, sha256OfText } from './testing';
@@ -88,6 +88,7 @@ describe('connect (OAuth + PKCE)', () => {
     expect(grantedScopes(deps)).toEqual(['elosorter:sync']);
     expect(deps.storage.getItem('elo:lifehub.tokens.v1')).not.toBeNull();
     expect(deps.storage.getItem('elo:spotify_access_token')).toBe('spotify-token'); // Spotify 토큰은 그대로
+    expect(connectedAt(deps)).toBe(deps.now()); // 보드 업로드의 권한 부족 멈춤을 풀 기준
     // 일회용: 결과와 대기 정보가 지워졌다
     expect(deps.session.getItem(CALLBACK_KEY)).toBeNull();
     expect(deps.session.getItem('elo:lifehub.pending-auth.v1')).toBeNull();
