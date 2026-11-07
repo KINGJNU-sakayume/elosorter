@@ -69,6 +69,8 @@ export interface LifeHubPanelProps {
   loggedIn: boolean;
   connectAvailable: boolean;
   replaced: boolean;
+  /** 보드 업로드 권한이 없는 옛 연결: 다시 연결 안내 (동기화는 그대로) */
+  boardNeedsReconnect?: boolean;
   busy: Busy;
   onConnect: () => void;
   onDisconnect: () => void;
@@ -86,6 +88,8 @@ const CAUSE_TEXT = {
   forbidden: '동기화 권한이 없는 연결입니다. 한 번 다시 연결하면 제안과 동기화가 함께 켜집니다.',
 } as const;
 
+export const BOARD_RECONNECT_TEXT = '보드에 올리려면 Life Hub에 다시 연결해 주세요. 동기화와 이 기기의 기록은 그대로입니다.';
+
 /** 설정의 「Life Hub」 섹션 화면 (컨텍스트 없이 그린다) */
 export function LifeHubPanel(p: LifeHubPanelProps) {
   const { view, snap, session } = p;
@@ -99,6 +103,15 @@ export function LifeHubPanel(p: LifeHubPanelProps) {
   );
   const reconnectButton = (
     <Button size="sm" variant="primary" icon={Link2} disabled={!p.connectAvailable} onClick={p.onConnect}>다시 연결</Button>
+  );
+  // 연결 끊김·동기화 권한 없음 안내에는 이미 다시 연결 버튼이 있다
+  const showBoardNote = !!p.boardNeedsReconnect && snap.connected
+    && !(view.kind === 'C' && (view.cause === 'disconnected' || view.cause === 'forbidden'));
+  const boardNote = showBoardNote && (
+    <div className="rounded-xl bg-sub p-3.5">
+      <p className="text-xs leading-relaxed">{BOARD_RECONNECT_TEXT}</p>
+      <div className="mt-3">{reconnectButton}</div>
+    </div>
   );
   const notDeployed = !p.connectAvailable && (
     <p className="text-xs leading-relaxed text-fg-2">배포된 주소에서만 연결할 수 있어요.</p>
@@ -157,6 +170,7 @@ export function LifeHubPanel(p: LifeHubPanelProps) {
           <Button size="sm" icon={RefreshCw} loading={syncing} disabled={!p.loggedIn} onClick={p.onSync}>지금 동기화</Button>
           {disconnectButton}
         </div>
+        {boardNote}
         {snap.remote && (
           <div className="rounded-xl bg-accent-soft p-3.5">
             <p className="text-[13px] font-semibold">Life Hub에 더 새 버전이 있습니다</p>
@@ -222,6 +236,7 @@ export function LifeHubPanel(p: LifeHubPanelProps) {
       <>
         <StatusLine view={view} />
         <div role="alert" className="rounded-xl bg-warn-soft p-3.5">{box}</div>
+        {boardNote}
         <div>{disconnectButton}</div>
         {snap.connected && advanced}
       </>
@@ -317,6 +332,7 @@ export default function LifeHubSync() {
       loggedIn={loggedIn}
       connectAvailable={hub.connectAvailable}
       replaced={replaced}
+      boardNeedsReconnect={hub.boardNeedsReconnect}
       busy={busy}
       onConnect={() => void hub.connect()}
       onDisconnect={() => void disconnect()}

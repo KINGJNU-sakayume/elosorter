@@ -66,7 +66,7 @@ Spotify 좋아요 곡·플레이리스트를 **티어 분류 → 1:1 비교**로
 
 여러 기기에서 같은 세션을 이어서 하도록, 세션을 내 [Life Hub](https://github.com/KINGJNU-sakayume/life-hub)의 비공개 저장소(`/elosorter/v1/sync`)에 보관합니다. 설계와 API는 life-hub의 `docs/P6_SYNC.md`가 계약입니다.
 
-- **연결**: 설정 → "Life Hub 연결". OAuth(Open Authorization, 개방형 인증) + PKCE(Proof Key for Code Exchange, 코드 교환 증명 키) 공개 클라이언트이고, scope는 `elosorter:sync` 하나입니다. 클라이언트 식별 문서는 `public/lifehub-client.json`, 돌아오는 주소는 `public/lifehub/`입니다. 두 파일은 배포 주소(`https://kingjnu-sakayume.github.io/elosorter/`, vite `base`와 같음)에 묶여 있어 그 주소에서만 연결됩니다. Life Hub 쪽에는 배포 변수 `HUB_ELOSORTER_REDIRECT_URI`가 필요합니다.
+- **연결**: 설정 → "Life Hub 연결". OAuth(Open Authorization, 개방형 인증) + PKCE(Proof Key for Code Exchange, 코드 교환 증명 키) 공개 클라이언트이고, scope는 `elosorter:sync elosorter:board`입니다(보드 타일 업로드는 아래 「보드 타일」 절). 클라이언트 식별 문서는 `public/lifehub-client.json`, 돌아오는 주소는 `public/lifehub/`입니다. 두 파일은 배포 주소(`https://kingjnu-sakayume.github.io/elosorter/`, vite `base`와 같음)에 묶여 있어 그 주소에서만 연결됩니다. Life Hub 쪽에는 배포 변수 `HUB_ELOSORTER_REDIRECT_URI`가 필요합니다.
 - **토큰**: Spotify 토큰(`elo:spotify_*`)과 별도로 `localStorage`의 `elo:lifehub.*`에 저장됩니다. 위 "토큰 저장 방식"의 주의가 그대로 적용됩니다.
 - **동기화 문서**: 압축하지 않은 JSON. 저장·백업 파일과 같은 형식에서, 앱이 불러올 때 다시 계산하는 곡의 `rating`·`sigma`만 뺍니다(`src/core/session/syncDoc.ts`). 크기는 설정 화면의 "동기화 문서 크기 / 한도"로 보이며, **900 KiB**(921,600바이트)를 넘으면 자동 동기화를 하지 않고 "너무 큼"으로 안내합니다. 잘라 내거나 일부만 올리지 않습니다.
 - **충돌**: 세션의 `syncVersion`(이 기기 사본이 기반한 서버 version)으로 판단합니다. 쓰기는 `If-Match`로 하고, 서버 version이 다르면 자동으로 올리지 않고 "클라우드 것 쓰기 / 이 기기로 덮어쓰기"를 묻습니다. 클라우드 것을 쓰기 전의 이 기기 세션은 파일로 내려받을 수 있게 남겨 둡니다.
@@ -74,6 +74,27 @@ Spotify 좋아요 곡·플레이리스트를 **티어 분류 → 1:1 비교**로
 - **끄기·로그아웃**: 동기화를 끄면 그 뒤로는 이 기기와 백업 파일에만 저장하고, 다시 켜면 꺼진 동안의 변경을 올립니다. 동기화가 켜져 있어도 Spotify에서 로그아웃하면 세션 주인을 확인할 수 없어 보내지 않습니다(이 기기에는 계속 저장).
 - **다른 계정**: 로컬 세션에 주인(Spotify user id, `ownerId`)을 기록해, 다른 계정으로 로그인하면 그 세션을 Life Hub에 올리지 않고 먼저 묻습니다.
 - 세션 내용은 공개 저장소·로그·오류 메시지에 들어가지 않습니다. 오류에는 상태 코드와 고정 문구만 보입니다.
+
+### 보드 타일
+
+[Life Board](https://github.com/KINGJNU-sakayume/board)에 보일 타일 목록(manifest v1)을 만들어 Life Hub(`PUT /elosorter/v1/board`, scope `elosorter:board`)에 올립니다. 올리는 것은 **보드용 목록뿐**이고 세션(곡 목록·비교 기록)은 올리지 않습니다. 규격은 board의 `docs/TILES.md`·`js/schema.js`, Hub 쪽은 life-hub `docs/P7_BOARD.md` 5장입니다. 모양은 보드가 정하고 이 앱은 데이터만 만듭니다.
+
+| id | 타일 | 톤·형태 | 크기 (처음) | 처음부터 보임 | 데이터 출처 |
+|---|---|---|---|---|---|
+| `ranking` | 현재 순위 | type·list | 1x1 2x1 **2x2** | ✓ | 순위 상위 5곡(상세 창 12곡), 앨범 썸네일, 비교 횟수(`compCount`), 이 기기의 마지막 저장 날짜. ▲▼는 **마지막 비교 한 건이 바꾼 순위**: 마지막 비교를 뺀 기록으로 순위를 다시 계산해 비교합니다. 비교 기록이 없으면(v1에서 옮긴 세션) 빼고 보냅니다 |
+| `last` | 최근 비교 | type·line | **2x1** 4x1 | | 마지막 비교 기록의 두 곡과 결과(확실히·조금 더·비슷함). 비교 기록에는 시각이 없어 날짜는 이 기기의 마지막 저장 날짜입니다(다른 기기에서 받은 세션은 받은 날) |
+| `session` | 정렬 진행 | type·num | **1x1** 2x1 | | 예상 정확도(%)와 비교 수·분류한 곡 수·티어 분류만 했을 때의 정확도. 앱에 "남은 비교 수" 추정이 없어 정확도로 진행을 보여 줍니다 |
+| `added` | 새로 들어온 곡 | strip (정사각) | 2x1 **4x1** | | Spotify에 추가된 날짜(`addedAt`) 최신 8곡의 표지, 분류 대기 곡 수. 다음에 분류할 곡이 보입니다 |
+
+- **왜 이 타일인가**: 이번 주 몇 곡 같은 통계보다 최근 흐름(지금 순위, 방금 한 비교, 다음에 분류할 곡)을 보여 줍니다. 처음에는 `ranking`만 보이고, 나머지는 보드의 '위젯 추가'에서 켭니다. id는 사용자 배치가 저장되는 키라 바꾸지 않습니다.
+- **만드는 곳**: `src/core/board/tiles.ts`의 `buildBoardTiles(session, now)` — 순수 함수(네트워크·저장소·무작위 없음, 같은 입력이면 같은 출력). 글자는 규격 길이로 자르고, 빈 글자는 필드째 뺍니다. 날짜는 "오늘·어제" 대신 `11/7`처럼 씁니다.
+- **표지**: Spotify 앨범 아트 주소만 보냅니다(`https://i.scdn.co`, board 허용 출처). 행 썸네일·strip은 앱이 목록용으로 고른 이미지(Spotify가 주는 320px 이하 중 가장 큰 것, 보통 300×300)를 씁니다. 주소가 없거나 허용 출처 밖이면 첫 글자 칸(`{mono}`)입니다. 앨범 색을 앱이 모르므로 포인트색(`accent`)은 보내지 않습니다.
+- **빈 상태**: 분류한 곡이 하나도 없으면 올리지 않습니다(새 기기가 빈 목록으로 다른 기기의 목록을 덮지 않게). 분류한 곡이 2곡 미만이면 `session`, 비교 기록이 없으면 `last`, 추가 날짜가 없으면 `added`를 뺍니다.
+- **예시 출력**: [`board/sample.json`](board/sample.json) — 지어낸 세션(`src/core/board/sampleState.ts`)으로 만든 것. `npm run board:sample`로 다시 만들고, `npm run bench`가 코드와 같은지, `npm test`가 규격(board `js/schema.js` 복사본 `src/test/boardSchema.js`)을 통과하는지 확인합니다.
+- **언제 올리나** (`src/services/lifehub/boardUpload.ts`, `src/state/useBoardUpload.ts`): 세션이 바뀌면 마지막 전송에서 10분이 지났으면 바로, 아니면 10분이 차는 때 한 번 보냅니다(**10분에 한 번 이하**). 내용이 마지막 성공과 같으면(`generated_at`을 뺀 sha256) 보내지 않지만, 앱을 열 때 마지막 성공이 하루보다 오래됐으면 같아도 한 번 보냅니다(보드의 '오래됨'은 Hub가 받은 시각 기준). 보내는 중에 생긴 변경도 10분이 차는 때 보냅니다. 못 보낸 채 앱이 닫히면 다음에 열 때 보냅니다. 상태는 `localStorage`의 `elo:lifehub.board.v1`(개인 데이터 아님)에 둡니다.
+- **어느 기기에서**: Life Hub에 연결된 기기 중, **이번 실행에서 동기화가 서버와 맞춘 뒤**의 기기만 올립니다(서버에 더 새 버전이 있거나 충돌 중이면 기다립니다). 그래서 받기 전의 옛 세션을 올리지 않습니다. 동기화하려면 Spotify 로그인이 필요하므로, 로그아웃 상태나 다른 계정의 세션이면 올리지 않습니다. 동기화 권한이 없는 연결이면 이 기기의 세션을 그대로 올립니다.
+- **실패**: 네트워크 오류·5xx는 10분 뒤 다시 시도합니다. 400·413은 이 앱 쪽 문제라 같은 내용으로 다시 보내지 않고 개발자 콘솔에만 남깁니다(기기 시계가 5분 넘게 빠르면 400이 날 수 있습니다). 업로드 실패는 다른 기능을 막지 않습니다.
+- **다시 연결이 필요한 경우**: board 권한(`elosorter:board`)이 생기기 전에 만든 연결은 첫 업로드가 `403 insufficient_scope`를 받습니다. 이때 Life Hub 토큰은 **지우지 않고**(동기화는 그대로) 설정의 Life Hub 섹션에 "보드에 올리려면 Life Hub에 다시 연결해 주세요"와 「다시 연결」을 보여 줍니다. 한 번 다시 연결하면 풀립니다(토큰 응답에 scope가 없어도, 멈춘 뒤 다시 연결을 마쳤으면 한 번 다시 시도합니다). 401이 토큰 갱신 뒤에도 남거나 다른 403이면 동기화와 같은 규칙(연결 해제)을 따릅니다. 보드 요청 함수(`boardRequest`)는 동기화 요청 함수와 따로 둡니다.
 
 ### Supabase 백업을 쓰던 경우 (이전 안내)
 
@@ -126,11 +147,12 @@ npm run typecheck    # tsc -b
 npm test             # 단위 테스트 (Vitest)
 npm run bench        # 정렬 알고리즘 시뮬레이션 (빠른 버전, 회귀 검사 포함)
 npm run bench:full   # 문서에 실린 전체 시뮬레이션 (약 10분)
+npm run board:sample # 보드 예시 출력(board/sample.json) 다시 만들기
 npm run build        # 프로덕션 빌드
 npm run build:gh     # GitHub Pages용 빌드 (base 경로 자동)
 ```
 
-브라우저 E2E(End-to-End, 종단 간) 스모크는 사전 설치된 Playwright로 수동 실행합니다(의존성 추가 없음, CI(Continuous Integration, 지속적 통합)에는 없음). 모의 Spotify·모의 Life Hub로 구형 설정 로드, 로그아웃 사용, 동기화 끄기·켜기를 확인하고 `*.supabase.co` 요청이 0건인지 봅니다.
+브라우저 E2E(End-to-End, 종단 간) 스모크는 사전 설치된 Playwright로 수동 실행합니다(의존성 추가 없음, CI(Continuous Integration, 지속적 통합)에는 없음). 모의 Spotify·모의 Life Hub로 구형 설정 로드, 로그아웃 사용, 동기화 끄기·켜기, 보드 업로드(권한 부족이어도 토큰 유지)를 확인하고 `*.supabase.co` 요청이 0건인지 봅니다.
 
 ```bash
 npx vite build && (npx vite preview --port 4173 &) && node e2e/smoke.mjs
@@ -142,14 +164,15 @@ Node 22 이상이 필요합니다.
 
 ```
 src/
-  core/        순수 로직 — 레이팅 모델(rating/), 저장 형식·마이그레이션(session/). React·브라우저 API 없음
-  services/    외부 입출력 — Spotify(auth·api·응답 검증), 저장소(localStorage), Life Hub 동기화(lifehub/), 설정, 파일 내보내기
+  core/        순수 로직 — 레이팅 모델(rating/), 저장 형식·마이그레이션(session/), 보드 타일 목록(board/). React·브라우저 API 없음
+  services/    외부 입출력 — Spotify(auth·api·응답 검증), 저장소(localStorage), Life Hub 동기화·보드 업로드(lifehub/), 설정, 파일 내보내기
   state/       순수 리듀서 + Provider (로컬 자동 저장, Life Hub 동기화, 저장 상태, 토스트)
   player/      Web Playback SDK 훅, 재생 요청 줄(playQueue), 재생 버튼, 임베드 대체 플레이어
   phases/      화면: import · tier · sort · rank
   components/  앱 틀(shell/: 사이드바·상단 바·탭 바)·저장 상태·공용 UI(ui/)
   hooks/ lib/ theme/
 bench/         가상 사용자 시뮬레이션 (v1 알고리즘 재현 포함)
+board/         보드 타일 예시 출력 (지어낸 값)
 e2e/           브라우저 E2E 스모크 (수동 실행)
 docs/          분석 문서
 ```

@@ -35,7 +35,8 @@ const LEGACY_CONFIG = JSON.stringify({ clientId: 'e2e-client', supabaseUrl: 'htt
 
 // ── 모의 서버 ────────────────────────────────────────────────────────────
 function mockHub() {
-  const hub = { doc: null, puts: 0 };
+  // boardScope: false면 board 권한 전의 연결처럼 보드 업로드에 403 insufficient_scope
+  const hub = { doc: null, puts: 0, boards: [], boardScope: false };
   hub.handle = async route => {
     const req = route.request();
     const url = new URL(req.url());
@@ -52,6 +53,11 @@ function mockHub() {
       hub.puts++;
       hub.doc = { version: base + 1, body, sha256: createHash('sha256').update(body, 'utf8').digest('hex'), writtenAt: new Date().toISOString(), device: h['x-device-label'] ?? null };
       return json(200, { version: hub.doc.version, sha256: hub.doc.sha256, written_at: hub.doc.writtenAt });
+    }
+    if (url.pathname === '/elosorter/v1/board' && req.method() === 'PUT') {
+      hub.boards.push(req.postData() ?? '');
+      if (!hub.boardScope) return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'insufficient_scope' }), headers: { 'Access-Control-Allow-Origin': '*', 'WWW-Authenticate': 'Bearer error="insufficient_scope", scope="elosorter:board"' } });
+      return json(200, { ok: true });
     }
     return json(404, { error: 'Not found' });
   };
@@ -153,6 +159,13 @@ try {
     assert(JSON.parse(hub.doc.body).tracks.length === 12 && !('syncedAt' in JSON.parse(hub.doc.body)), '올라간 문서: 12곡, syncedAt 없음');
     await dialog.getByText(/^연결됨 · 오늘 \d\d:\d\d 동기화$/).waitFor();
     assert(true, '상태 줄: "연결됨 · 오늘 HH:MM 동기화"');
+    // 보드: 동기화로 맞춘 뒤 한 번 올려 보고, board 권한이 없는 옛 연결이라 403 insufficient_scope → 토큰은 그대로, 다시 연결 안내
+    await dialog.getByText('보드에 올리려면 Life Hub에 다시 연결해 주세요.', { exact: false }).waitFor();
+    assert(hub.boards.length === 1, '보드 목록을 1번 올려 봄');
+    const board = JSON.parse(hub.boards[0]);
+    assert(board.app === 'elosorter' && board.tiles[0].id === 'ranking' && !hub.boards[0].includes('e2etrack'), '보드 목록: elosorter, 순위 타일, 곡 id·기록 없음');
+    assert(await page.evaluate(() => localStorage.getItem('elo:lifehub.tokens.v1') !== null), '보드 권한 부족에도 Life Hub 토큰 유지');
+    assert(await dialog.getByRole('button', { name: '지금 동기화' }).isEnabled(), '동기화는 그대로');
 
     await dialog.getByRole('button', { name: '연결 해제' }).click();
     await page.getByRole('button', { name: '연결 끊기' }).click();

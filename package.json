@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "bench": "vitest run --config bench/vitest.config.ts",
-    "bench:full": "BENCH=full vitest run --config bench/vitest.config.ts"
+    "bench:full": "BENCH=full vitest run --config bench/vitest.config.ts",
+    "board:sample": "BOARD_SAMPLE=write vitest run --config bench/vitest.config.ts bench/boardSample.test.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",

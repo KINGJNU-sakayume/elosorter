@@ -27,7 +27,7 @@ const TOKENS_KEY = 'elo:lifehub.tokens.v1';
  *  - 변경 10개마다, 또는 마지막 변경 15초 뒤에 올린다. 오류로 멈췄던 것은 30초 뒤에 다시 (savePolicy.ts).
  *  - 탭이 숨겨질 때 남은 변경을 바로 올려 본다.
  */
-export function useLifeHubSync({ state, dispatch, flushLocal, toast }: Options): HubInfo {
+export function useLifeHubSync({ state, dispatch, flushLocal, toast }: Options): Omit<HubInfo, 'boardNeedsReconnect'> {
   const loggedIn = useLoggedIn();
   const userId = loggedIn ? state.user?.id ?? null : null;
   const unsaved = Math.max(0, state.revision - state.hubRevision);

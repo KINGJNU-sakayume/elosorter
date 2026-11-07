@@ -46,6 +46,8 @@ export interface HubInfo {
   loadCloud: () => Promise<LoadCloudOutcome>;
   overwrite: () => Promise<PushOutcome>;
   syncNow: () => Promise<void>;
+  /** 보드 업로드가 권한 부족(insufficient_scope)으로 멈췄다: 다시 연결하면 풀린다. 동기화는 그대로 */
+  boardNeedsReconnect: boolean;
 }
 
 export interface SaveInfo {

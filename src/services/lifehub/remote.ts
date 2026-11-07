@@ -1,7 +1,8 @@
 // ELO Sorter ↔ Life Hub 연결 (OAuth 2.1 인증 코드 + PKCE S256, 공개 클라이언트).
 //
 // - 클라이언트는 public/lifehub-client.json(CIMD: Client ID Metadata Document, 클라이언트 ID 메타데이터 문서)이 식별한다.
-// - 요청 scope는 'elosorter:sync' 하나이고 필수다 (elosorter는 동기화 전용 목적지: 인박스·제안·카드가 없다).
+// - 요청 scope는 'elosorter:sync elosorter:board'다 (elosorter는 동기화 + 보드 목록만 쓰는 목적지: 인박스·제안·카드가 없다).
+//   board 권한 전에 만든 연결은 보드 업로드가 403 insufficient_scope를 받는다. 그때도 토큰은 지우지 않는다 (boardRequest).
 // - Life Hub는 /lifehub/(public/lifehub/index.html)로 돌려보내고, 그 페이지가 결과를 sessionStorage에 넘긴다.
 // - 토큰은 Spotify 토큰('elo:spotify_*')과 섞이지 않게 'elo:lifehub.*' 키에 따로 둔다.
 // - 오류 메시지에는 고정 문구와 상태 코드만 넣는다. 응답 본문·토큰·세션 내용은 넣지 않는다.
@@ -14,12 +15,18 @@ export const CALLBACK_URL = APP_URL + 'lifehub/';
 export const CLIENT_ID = APP_URL + 'lifehub-client.json';
 export const RESOURCE = LIFEHUB_ORIGIN + '/elosorter';
 export const SYNC_SCOPE = 'elosorter:sync';
+/** 보드 타일 목록 업로드 (PUT /elosorter/v1/board) */
+export const BOARD_SCOPE = 'elosorter:board';
+/** 연결할 때 요청하는 scope 전체 */
+export const SCOPE = `${SYNC_SCOPE} ${BOARD_SCOPE}`;
 const API = RESOURCE + '/v1';
 
 /** public/lifehub/index.html이 쓰는 키와 같아야 한다 */
 export const CALLBACK_KEY = 'elo:lifehub.callback.v1';
 const TOKENS_KEY = 'elo:lifehub.tokens.v1';
 const PENDING_AUTH_KEY = 'elo:lifehub.pending-auth.v1';
+/** 마지막으로 연결(인증 코드 교환)을 마친 시각(ms). 비밀이 아니다. 보드 업로드의 권한 부족 멈춤을 다시 연결 뒤 푸는 데 쓴다 */
+export const CONNECTED_AT_KEY = 'elo:lifehub.connected-at.v1';
 const AUTH_MAX_AGE_MS = 10 * 60 * 1000;
 const SYNC_TIMEOUT_MS = 30_000;
 
@@ -46,8 +53,11 @@ export function browserDeps(): Deps {
   };
 }
 
-/** 'no_sync_scope': 토큰은 유효하지만 동기화 권한이 없다 (동의 화면에서 거부했거나 권한 없음) */
-export type LifeHubErrorKind = 'not_connected' | 'denied' | 'state' | 'network' | 'server' | 'no_sync_scope';
+/**
+ * 'no_sync_scope': 토큰은 유효하지만 동기화 권한이 없다 (동의 화면에서 거부했거나 권한 없음).
+ * 'no_board_scope': 토큰은 유효하지만 보드 업로드 권한이 없다 (board 권한 전에 만든 연결).
+ */
+export type LifeHubErrorKind = 'not_connected' | 'denied' | 'state' | 'network' | 'server' | 'no_sync_scope' | 'no_board_scope';
 export class LifeHubError extends Error {
   kind: LifeHubErrorKind;
   constructor(kind: LifeHubErrorKind, message: string) {
@@ -93,6 +103,15 @@ export function grantedScopes(deps: Pick<Deps, 'storage'>): string[] | null {
 /** 토큰이 동기화 scope가 없다고 알려진 경우에만 false. 모르면 시도하고 403이 알려 준다 */
 export const mayHaveSyncScope = (deps: Pick<Deps, 'storage'>): boolean => grantedScopes(deps)?.includes(SYNC_SCOPE) ?? true;
 
+/** 마지막으로 연결을 마친 시각. 모르면 null */
+export function connectedAt(deps: Pick<Deps, 'storage'>): number | null {
+  const n = Number(deps.storage.getItem(CONNECTED_AT_KEY));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** 토큰이 보드 scope를 가진다고 알려진 경우에만 true (다시 연결한 뒤 멈춤을 풀 때 쓴다) */
+export const knownBoardScope = (deps: Pick<Deps, 'storage'>): boolean => grantedScopes(deps)?.includes(BOARD_SCOPE) ?? false;
+
 /** 연결을 시작한다: 승인 화면 주소를 돌려준다 (호출한 쪽이 이동시킨다) */
 export async function beginConnect(deps: Deps): Promise<string> {
   const verifier = b64url(deps.random(32));
@@ -101,7 +120,7 @@ export async function beginConnect(deps: Deps): Promise<string> {
   const pending: PendingAuth = { state, verifier, created_at: deps.now() };
   deps.session.setItem(PENDING_AUTH_KEY, JSON.stringify(pending));
   const q = new URLSearchParams({
-    response_type: 'code', client_id: CLIENT_ID, redirect_uri: CALLBACK_URL, scope: SYNC_SCOPE, state,
+    response_type: 'code', client_id: CLIENT_ID, redirect_uri: CALLBACK_URL, scope: SCOPE, state,
     code_challenge: challenge, code_challenge_method: 'S256', resource: RESOURCE,
   });
   return LIFEHUB_ORIGIN + '/authorize?' + q.toString();
@@ -159,6 +178,7 @@ export async function completeStoredCallback(deps: Deps): Promise<boolean> {
   const code = q.get('code');
   if (!code) throw new LifeHubError('state', '인증 코드가 없어요.');
   await tokenRequest(deps, { grant_type: 'authorization_code', code, redirect_uri: CALLBACK_URL, code_verifier: pending.verifier, resource: RESOURCE });
+  try { deps.storage.setItem(CONNECTED_AT_KEY, String(deps.now())); } catch { /* 없어도 scope로 판단한다 */ }
   return true;
 }
 
@@ -202,6 +222,49 @@ export async function syncRequest(
   if (response.status === 401) response = await send(await accessToken(deps, true));
   if (response.status === 403 && /error="?insufficient_scope"?/i.test(response.headers.get('WWW-Authenticate') ?? ''))
     throw new LifeHubError('no_sync_scope', '이 연결에는 동기화 권한이 없어요. 다시 연결하면서 동기화를 허용해 주세요.');
+  if (response.status === 401 || response.status === 403) {
+    deps.storage.removeItem(TOKENS_KEY);
+    throw new LifeHubError('not_connected', 'Life Hub 연결이 더 이상 유효하지 않아요. 다시 연결해 주세요.');
+  }
+  return response;
+}
+
+const BOARD_TIMEOUT_MS = 30_000;
+
+/**
+ * 403이 권한(scope) 부족인가. `WWW-Authenticate`를 먼저 보고, 브라우저가 그 헤더를 못 읽는 경우(CORS로 노출되지 않음)를 위해
+ * 본문의 `{"error":"insufficient_scope"}`도 받는다. 본문은 판단에만 쓰고 메시지에 넣지 않는다.
+ */
+async function isInsufficientScope(response: Response): Promise<boolean> {
+  if (/error="?insufficient_scope"?/i.test(response.headers.get('WWW-Authenticate') ?? '')) return true;
+  const body = (await response.clone().json().catch(() => null)) as { error?: unknown } | null;
+  return body?.error === 'insufficient_scope';
+}
+
+/**
+ * 보드 타일 목록 업로드 (`PUT /elosorter/v1/board`, scope `elosorter:board`). syncRequest와 일부러 따로 둔다:
+ * syncRequest는 그 밖의 403에서 토큰을 지우는데, 그대로 쓰면 board 권한이 없는 옛 연결의 첫 업로드가 동기화 연결까지 끊는다.
+ * - 403 + `WWW-Authenticate: … error="insufficient_scope"`를 **먼저** 본다 → `no_board_scope`. 토큰은 지우지 않는다.
+ * - 401은 토큰을 한 번 갱신해 다시 보낸다. 갱신 뒤에도 남은 401, 그 밖의 403은 기존 규칙대로 토큰을 지운다 (`not_connected`).
+ * - 네트워크 실패는 'network'. 오류 메시지에 응답 본문·토큰을 넣지 않는다.
+ */
+export async function boardRequest(deps: Deps, body: string): Promise<Response> {
+  const send = async (token: string) => {
+    try {
+      return await deps.fetch(API + '/board', {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body,
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(BOARD_TIMEOUT_MS) : undefined,
+      });
+    } catch {
+      throw new LifeHubError('network', 'Life Hub에 연결할 수 없어요. 네트워크를 확인해 주세요.');
+    }
+  };
+  let response = await send(await accessToken(deps));
+  if (response.status === 401) response = await send(await accessToken(deps, true));
+  if (response.status === 403 && await isInsufficientScope(response))
+    throw new LifeHubError('no_board_scope', '보드에 올리려면 Life Hub에 다시 연결해 주세요.');
   if (response.status === 401 || response.status === 403) {
     deps.storage.removeItem(TOKENS_KEY);
     throw new LifeHubError('not_connected', 'Life Hub 연결이 더 이상 유효하지 않아요. 다시 연결해 주세요.');
