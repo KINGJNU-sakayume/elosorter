@@ -1,0 +1,368 @@
+{
+  "version": 1,
+  "app": "elosorter",
+  "generated_at": "2026-11-07T12:00:00.000Z",
+  "tiles": [
+    {
+      "id": "ranking",
+      "name": "ELO Sorter · 현재 순위",
+      "tone": "type",
+      "form": "list",
+      "sizes": [
+        "1x1",
+        "2x1",
+        "2x2"
+      ],
+      "size": "2x2",
+      "default": true,
+      "href": "https://kingjnu-sakayume.github.io/elosorter/",
+      "detail": {
+        "title": "ELO Sorter · 상위 8곡",
+        "rows": [
+          {
+            "rank": 1,
+            "title": "새벽의 항해",
+            "trend": "same",
+            "sub": "물결 악단",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000001",
+              "alt": ""
+            }
+          },
+          {
+            "rank": 2,
+            "title": "유리 정원",
+            "trend": "same",
+            "sub": "낮달",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000002",
+              "alt": ""
+            }
+          },
+          {
+            "rank": 3,
+            "title": "낮은 파도",
+            "trend": "same",
+            "sub": "물결 악단",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000003",
+              "alt": ""
+            }
+          },
+          {
+            "rank": 4,
+            "title": "긴 오후",
+            "value": "1",
+            "trend": "up",
+            "sub": "종이비행",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000004",
+              "alt": ""
+            }
+          },
+          {
+            "rank": 5,
+            "title": "먼 불빛",
+            "value": "1",
+            "trend": "down",
+            "sub": "낮달",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000005",
+              "alt": ""
+            }
+          },
+          {
+            "rank": 6,
+            "title": "골목의 끝",
+            "trend": "same",
+            "sub": "종이비행",
+            "cover": {
+              "mono": "골"
+            }
+          },
+          {
+            "rank": 7,
+            "title": "오래된 지도",
+            "trend": "same",
+            "sub": "소금빵",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000008",
+              "alt": ""
+            }
+          },
+          {
+            "rank": 8,
+            "title": "겨울 정거장",
+            "trend": "same",
+            "sub": "소금빵",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000007",
+              "alt": ""
+            }
+          }
+        ]
+      },
+      "data": {
+        "label": "ELO Sorter · 좋아요한 곡",
+        "rows": [
+          {
+            "rank": 1,
+            "title": "새벽의 항해",
+            "trend": "same",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000001",
+              "alt": ""
+            }
+          },
+          {
+            "rank": 2,
+            "title": "유리 정원",
+            "trend": "same",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000002",
+              "alt": ""
+            }
+          },
+          {
+            "rank": 3,
+            "title": "낮은 파도",
+            "trend": "same",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000003",
+              "alt": ""
+            }
+          },
+          {
+            "rank": 4,
+            "title": "긴 오후",
+            "value": "1",
+            "trend": "up",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000004",
+              "alt": ""
+            }
+          },
+          {
+            "rank": 5,
+            "title": "먼 불빛",
+            "value": "1",
+            "trend": "down",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000005",
+              "alt": ""
+            }
+          }
+        ],
+        "foot": "비교 214회 · 11/7"
+      }
+    },
+    {
+      "id": "last",
+      "name": "ELO Sorter · 최근 비교",
+      "tone": "type",
+      "form": "line",
+      "sizes": [
+        "2x1",
+        "4x1"
+      ],
+      "size": "2x1",
+      "default": false,
+      "href": "https://kingjnu-sakayume.github.io/elosorter/",
+      "data": {
+        "label": "ELO Sorter · 최근 비교 · 11/7",
+        "title": "긴 오후 vs 먼 불빛",
+        "sub": "긴 오후 승 · 확실히",
+        "pill": "확실히"
+      }
+    },
+    {
+      "id": "session",
+      "name": "ELO Sorter · 정렬 진행",
+      "tone": "type",
+      "form": "num",
+      "sizes": [
+        "1x1",
+        "2x1"
+      ],
+      "size": "1x1",
+      "default": false,
+      "href": "https://kingjnu-sakayume.github.io/elosorter/",
+      "data": {
+        "label": "ELO Sorter · 예상 정확도",
+        "value": "85.4",
+        "unit": "%",
+        "caption": "11/7 기준",
+        "sub": "임의의 두 곡의 앞뒤가 취향과 맞을 확률의 추정치",
+        "foot": [
+          {
+            "k": "비교",
+            "v": "214회"
+          },
+          {
+            "k": "분류",
+            "v": "8/10"
+          },
+          {
+            "k": "분류만",
+            "v": "81.6%"
+          }
+        ]
+      }
+    },
+    {
+      "id": "added",
+      "name": "ELO Sorter · 새로 들어온 곡",
+      "tone": "strip",
+      "sizes": [
+        "2x1",
+        "4x1"
+      ],
+      "size": "4x1",
+      "default": false,
+      "href": "https://kingjnu-sakayume.github.io/elosorter/",
+      "detail": {
+        "title": "ELO Sorter · 새로 들어온 곡",
+        "rows": [
+          {
+            "title": "첫눈 예보",
+            "value": "분류 대기",
+            "sub": "물결 악단 · 11/6 추가",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000009",
+              "alt": ""
+            }
+          },
+          {
+            "title": "늦은 답장",
+            "value": "분류 대기",
+            "sub": "낮달 · 11/5 추가",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000010",
+              "alt": ""
+            }
+          },
+          {
+            "title": "먼 불빛",
+            "value": "T2",
+            "sub": "낮달 · 10/12 추가",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000005",
+              "alt": ""
+            },
+            "muted": true
+          },
+          {
+            "title": "긴 오후",
+            "value": "T2",
+            "sub": "종이비행 · 10/1 추가",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000004",
+              "alt": ""
+            },
+            "muted": true
+          },
+          {
+            "title": "새벽의 항해",
+            "value": "T1",
+            "sub": "물결 악단 · 9/2 추가",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000001",
+              "alt": ""
+            },
+            "muted": true
+          },
+          {
+            "title": "유리 정원",
+            "value": "T1",
+            "sub": "낮달 · 8/14 추가",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000002",
+              "alt": ""
+            },
+            "muted": true
+          },
+          {
+            "title": "낮은 파도",
+            "value": "T1",
+            "sub": "물결 악단 · 7/30 추가",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000003",
+              "alt": ""
+            },
+            "muted": true
+          },
+          {
+            "title": "골목의 끝",
+            "value": "T2",
+            "sub": "종이비행 · 6/20 추가",
+            "cover": {
+              "mono": "골"
+            },
+            "muted": true
+          }
+        ]
+      },
+      "data": {
+        "label": "ELO Sorter · 분류 대기 2곡",
+        "square": true,
+        "items": [
+          {
+            "title": "첫눈 예보",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000009",
+              "alt": ""
+            }
+          },
+          {
+            "title": "늦은 답장",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000010",
+              "alt": ""
+            }
+          },
+          {
+            "title": "먼 불빛",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000005",
+              "alt": ""
+            }
+          },
+          {
+            "title": "긴 오후",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000004",
+              "alt": ""
+            }
+          },
+          {
+            "title": "새벽의 항해",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000001",
+              "alt": ""
+            }
+          },
+          {
+            "title": "유리 정원",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000002",
+              "alt": ""
+            }
+          },
+          {
+            "title": "낮은 파도",
+            "cover": {
+              "src": "https://i.scdn.co/image/ab67616d00001e02000000000000000000000003",
+              "alt": ""
+            }
+          },
+          {
+            "title": "골목의 끝",
+            "cover": {
+              "mono": "골"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

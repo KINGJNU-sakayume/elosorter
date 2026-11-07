@@ -53,7 +53,7 @@ describe('connect (OAuth + PKCE)', () => {
     expect(q.get('response_type')).toBe('code');
     expect(q.get('client_id')).toBe(CLIENT_ID);
     expect(q.get('redirect_uri')).toBe(CALLBACK_URL);
-    expect(q.get('scope')).toBe('elosorter:sync');
+    expect(q.get('scope')).toBe('elosorter:sync elosorter:board');
     expect(q.get('resource')).toBe(RESOURCE);
     expect(q.get('code_challenge_method')).toBe('S256');
     const pending = JSON.parse(deps.session.getItem('elo:lifehub.pending-auth.v1')!);

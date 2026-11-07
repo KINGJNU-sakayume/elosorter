@@ -55,6 +55,11 @@ export interface HubSnapshot {
   detail: string | null;
   deviceLabel: string | null;
   effectiveLabel: string;
+  /**
+   * 이번 실행에서 서버와 한 번이라도 맞춰 봤다 (meta 확인·업로드·받아오기 성공). 메모리에만 둔다.
+   * 보드 업로드는 이것이 true이고 remote·conflict가 없을 때만 한다: 받기 전의 옛 상태를 올리지 않게.
+   */
+  checked: boolean;
 }
 
 export interface HubHost {
@@ -105,6 +110,8 @@ export function createHubEngine({ deps, host, userAgent = '' }: EngineOptions) {
   let remote: RemoteInfo | null = null;
   /** 서버에 문서가 없는데 이 기기에는 있다: 내용이 그대로여도 다시 만들어야 한다 */
   let recreate = false;
+  /** 이번 실행에서 서버와 맞춰 봤다 (HubSnapshot.checked) */
+  let checked = false;
 
   const state = () => readState(deps.storage);
   const effectiveLabel = () => sanitizeDeviceLabel(state().deviceLabel) ?? defaultDeviceLabel(userAgent);
@@ -150,6 +157,7 @@ export function createHubEngine({ deps, host, userAgent = '' }: EngineOptions) {
     return {
       status, enabled: st.enabled, connected, everSucceeded: st.everSucceeded, lastSyncAt: st.lastSyncAt,
       remote, conflict, detail: detailFor(status), deviceLabel: st.deviceLabel, effectiveLabel: effectiveLabel(),
+      checked,
     };
   };
 
@@ -185,6 +193,7 @@ export function createHubEngine({ deps, host, userAgent = '' }: EngineOptions) {
 
   const succeed = (patch: { everSucceeded?: boolean; syncedKey: string }) => {
     updateState(deps.storage, { ...patch, pending: null, lastSyncAt: deps.now() });
+    checked = true;
     conflict = null;
     remote = null;
     retry = false;
@@ -245,6 +254,7 @@ export function createHubEngine({ deps, host, userAgent = '' }: EngineOptions) {
     const m = await getMeta(deps);
     if (!m.ok) { fail(m); notify(); return; }
     retry = false;
+    checked = true;
     const landed = takeLanded(m.meta);
     if (landed && m.meta) {
       // 응답을 잃었던 내 쓰기가 반영돼 있었다: 그것을 기준으로 삼는다
@@ -375,6 +385,7 @@ export function createHubEngine({ deps, host, userAgent = '' }: EngineOptions) {
       const adopted: SessionData = { ...doc.found.session, syncVersion: doc.found.meta.version };
       host.adopt(adopted);
       updateState(deps.storage, { syncedKey: await keyOf(adopted), pending: null, lastSyncAt: deps.now() });
+      checked = true;
       conflict = null;
       remote = null;
       retry = false;

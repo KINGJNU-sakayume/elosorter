@@ -4,7 +4,7 @@ import type { SessionData } from '../core/session/schema';
 import type { HubSnapshot, HubStatus } from '../services/lifehub/engine';
 import type { AppState } from '../state/reducer';
 import { AppStateContext } from '../state/context';
-import { LifeHubPanel, LifeHubStatusLine } from './LifeHubSync';
+import { BOARD_RECONNECT_TEXT, LifeHubPanel, LifeHubStatusLine } from './LifeHubSync';
 import { lifeHubView } from './lifeHubView';
 
 const session: SessionData = {
@@ -13,18 +13,19 @@ const session: SessionData = {
 };
 
 const snapshot = (over: Partial<HubSnapshot> = {}): HubSnapshot => ({
-  status: 'idle', enabled: true, connected: true, everSucceeded: true, lastSyncAt: null, remote: null, conflict: null,
+  status: 'idle', enabled: true, connected: true, everSucceeded: true, lastSyncAt: null, remote: null, conflict: null, checked: false,
   detail: null, deviceLabel: null, effectiveLabel: 'Chrome · Linux', ...over,
 });
 
 const noop = () => {};
 
-function panel(snap: HubSnapshot, { loggedIn = true, connectAvailable = true } = {}) {
+function panel(snap: HubSnapshot, { loggedIn = true, connectAvailable = true, boardNeedsReconnect = false } = {}) {
   const view = lifeHubView({ snap, loggedIn, unsaved: 0 });
   return renderToStaticMarkup(
     <AppStateContext.Provider value={{ session } as AppState}>
       <LifeHubPanel
         view={view} snap={snap} session={session} loggedIn={loggedIn} connectAvailable={connectAvailable} replaced={false} busy={null}
+        boardNeedsReconnect={boardNeedsReconnect}
         onConnect={noop} onDisconnect={noop} onSync={noop} onLoadCloud={noop} onOverwrite={noop}
         onDeviceLabel={noop} onDownloadReplaced={noop} onClearReplaced={noop}
       />
@@ -41,6 +42,16 @@ const sources = () => Object.entries(RAW).map(([path, text]) => ({ path: path.re
 const OFF = snapshot({ status: 'off', enabled: false, connected: false });
 
 describe('Life Hub section (settings)', () => {
+  it('board upload without permission: a reconnect note, sync stays as it is', () => {
+    const html = panel(snapshot(), { boardNeedsReconnect: true });
+    expect(html).toContain(BOARD_RECONNECT_TEXT);
+    expect(buttons(html)).toContain('다시 연결');
+    expect(buttons(html)).toContain('지금 동기화');
+    expect(panel(snapshot())).not.toContain(BOARD_RECONNECT_TEXT);
+    // 연결 끊김 안내에는 이미 다시 연결 버튼이 있어 겹치지 않는다
+    expect(panel(snapshot({ status: 'forbidden', detail: 'x' }), { boardNeedsReconnect: true })).not.toContain(BOARD_RECONNECT_TEXT);
+  });
+
   it('section title is exactly "Life Hub"', () => {
     expect(panel(OFF)).toMatch(/<h3[^>]*>Life Hub<\/h3>/);
   });
